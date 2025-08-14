@@ -1353,8 +1353,6 @@
             updateEmployeesTable();
             updateCurrentMonthAttendance();
             updatePaymentsTable();
-            updateDepartmentOptions();
-            updateCurrencyOptions();
             
             // Show notification that data has been loaded
             showToast('System ready. Data loaded successfully.', 'info');
@@ -1915,8 +1913,6 @@
             updateEmployeeSelects();
             updateEmployeesTable();
             updateDashboard();
-            updateDepartmentOptions();
-            updateCurrencyOptions();
             closeAddEmployeeModal();
             showToast('Employee added successfully', 'success');
         });
@@ -1987,8 +1983,6 @@
             updateEmployeeSelects();
             updateEmployeesTable();
             updateDashboard();
-            updateDepartmentOptions();
-            updateCurrencyOptions();
             closeEditEmployeeModal();
             showToast('Employee updated successfully', 'success');
         });
@@ -1998,6 +1992,8 @@
             
             selects.forEach(selectId => {
                 const select = document.getElementById(selectId);
+                if (!select) return;
+                
                 const currentValue = select.value;
                 
                 if (selectId === 'reportEmployee' || selectId === 'salaryEmployee' || selectId === 'paymentEmployee' || selectId === 'paymentEmployeeSelect' || selectId === 'editPaymentEmployeeSelect' || selectId === 'paymentReportEmployee') {
@@ -2019,6 +2015,8 @@
         
         function updateSalaryEmployeeSelect() {
             const select = document.getElementById('salaryEmployee');
+            if (!select) return;
+            
             const currentValue = select.value;
             
             select.innerHTML = '<option value="">All Employees</option>';
@@ -2035,6 +2033,7 @@
         
         function updatePaymentEmployeeSelect() {
             const select = document.getElementById('paymentEmployeeSelect');
+            if (!select) return;
             
             select.innerHTML = '<option value="">Select Employee</option>';
             
@@ -2048,7 +2047,9 @@
         
         function updateEmployeesTable() {
             const tbody = document.getElementById('employeesTableBody');
-            const searchTerm = document.getElementById('employeeSearch').value.toLowerCase();
+            if (!tbody) return;
+            
+            const searchTerm = document.getElementById('employeeSearch') ? document.getElementById('employeeSearch').value.toLowerCase() : '';
             
             const filteredEmployees = employees.filter(employee => 
                 employee.name.toLowerCase().includes(searchTerm) ||
@@ -2110,20 +2111,21 @@
                 updateEmployeeSelects();
                 updateEmployeesTable();
                 updateDashboard();
-                updateDepartmentOptions();
-                updateCurrencyOptions();
                 showToast('Employee deleted successfully', 'success');
             }
         }
         
         // Search functionality
-        document.getElementById('employeeSearch').addEventListener('input', updateEmployeesTable);
+        document.getElementById('employeeSearch')?.addEventListener('input', updateEmployeesTable);
         
         // Payment functions
         function showAddPaymentModal() {
             // Set today's date as default
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('paymentDate').value = today;
+            const paymentDateInput = document.getElementById('paymentDate');
+            if (paymentDateInput) {
+                paymentDateInput.value = today;
+            }
             
             document.getElementById('addPaymentModal').classList.remove('hidden');
             updatePaymentEmployeeSelect();
@@ -2131,10 +2133,13 @@
         
         function closeAddPaymentModal() {
             document.getElementById('addPaymentModal').classList.add('hidden');
-            document.getElementById('addPaymentForm').reset();
+            const addPaymentForm = document.getElementById('addPaymentForm');
+            if (addPaymentForm) {
+                addPaymentForm.reset();
+            }
         }
         
-        document.getElementById('addPaymentForm').addEventListener('submit', function(e) {
+        document.getElementById('addPaymentForm')?.addEventListener('submit', function(e) {
             e.preventDefault();
             
             const employeeId = document.getElementById('paymentEmployeeSelect').value;
@@ -2171,10 +2176,13 @@
         
         function closeEditPaymentModal() {
             document.getElementById('editPaymentModal').classList.add('hidden');
-            document.getElementById('editPaymentForm').reset();
+            const editPaymentForm = document.getElementById('editPaymentForm');
+            if (editPaymentForm) {
+                editPaymentForm.reset();
+            }
         }
         
-        document.getElementById('editPaymentForm').addEventListener('submit', function(e) {
+        document.getElementById('editPaymentForm')?.addEventListener('submit', function(e) {
             e.preventDefault();
             
             const index = document.getElementById('editPaymentIndex').value;
@@ -2197,9 +2205,11 @@
         
         function updatePaymentsTable() {
             const tbody = document.getElementById('paymentsTableBody');
-            const fromDate = document.getElementById('paymentFromDate').value;
-            const toDate = document.getElementById('paymentToDate').value;
-            const employeeId = document.getElementById('paymentEmployee').value;
+            if (!tbody) return;
+            
+            const fromDate = document.getElementById('paymentFromDate') ? document.getElementById('paymentFromDate').value : '';
+            const toDate = document.getElementById('paymentToDate') ? document.getElementById('paymentToDate').value : '';
+            const employeeId = document.getElementById('paymentEmployee') ? document.getElementById('paymentEmployee').value : '';
             
             let filteredPayments = payments;
             
@@ -2364,6 +2374,8 @@
             
             // Update salary table
             const tbody = document.getElementById('salaryTableBody');
+            if (!tbody) return;
+            
             tbody.innerHTML = salaryCalculations.map(calc => `
                 <tr>
                     <td class="px-6 py-4 whitespace-nowrap">
@@ -2402,11 +2414,11 @@
             const paymentOptions = document.getElementById('paymentReportOptions');
             
             if (reportType === 'attendance') {
-                attendanceOptions.classList.remove('hidden');
-                paymentOptions.classList.add('hidden');
+                if (attendanceOptions) attendanceOptions.classList.remove('hidden');
+                if (paymentOptions) paymentOptions.classList.add('hidden');
             } else if (reportType === 'payment') {
-                attendanceOptions.classList.add('hidden');
-                paymentOptions.classList.remove('hidden');
+                if (attendanceOptions) attendanceOptions.classList.add('hidden');
+                if (paymentOptions) paymentOptions.classList.remove('hidden');
             }
         }
         
@@ -2458,13 +2470,20 @@
             };
             
             // Update summary cards
-            document.getElementById('reportTotalDays').textContent = totalDays;
-            document.getElementById('reportDaysPresent').textContent = daysPresent;
-            document.getElementById('reportDaysAbsent').textContent = daysAbsent;
-            document.getElementById('reportAttendanceRate').textContent = attendanceRate + '%';
+            const reportTotalDays = document.getElementById('reportTotalDays');
+            const reportDaysPresent = document.getElementById('reportDaysPresent');
+            const reportDaysAbsent = document.getElementById('reportDaysAbsent');
+            const reportAttendanceRate = document.getElementById('reportAttendanceRate');
+            
+            if (reportTotalDays) reportTotalDays.textContent = totalDays;
+            if (reportDaysPresent) reportDaysPresent.textContent = daysPresent;
+            if (reportDaysAbsent) reportDaysAbsent.textContent = daysAbsent;
+            if (reportAttendanceRate) reportAttendanceRate.textContent = attendanceRate + '%';
             
             // Update detailed table
             const tbody = document.getElementById('reportTableBody');
+            if (!tbody) return;
+            
             tbody.innerHTML = filteredRecords.map(record => {
                 const employee = employees.find(e => e.id === record.employeeId);
                 const workingHours = record.checkIn && record.checkOut ? 
@@ -2497,10 +2516,16 @@
             }).join('');
             
             // Show attendance report results
-            document.getElementById('attendanceReportResults').classList.remove('hidden');
-            document.getElementById('paymentReportResults').classList.add('hidden');
-            document.getElementById('reportResults').classList.remove('hidden');
-            document.getElementById('reportResults').classList.add('fade-in');
+            const attendanceReportResults = document.getElementById('attendanceReportResults');
+            const paymentReportResults = document.getElementById('paymentReportResults');
+            const reportResults = document.getElementById('reportResults');
+            
+            if (attendanceReportResults) attendanceReportResults.classList.remove('hidden');
+            if (paymentReportResults) paymentReportResults.classList.add('hidden');
+            if (reportResults) {
+                reportResults.classList.remove('hidden');
+                reportResults.classList.add('fade-in');
+            }
         }
         
         function generatePaymentReport() {
@@ -2543,12 +2568,18 @@
                 getCurrencySymbol(employees.find(e => e.id === employeeId)?.currency || 'USD') : 
                 'USD';
             
-            document.getElementById('reportTotalPayments').textContent = currency + totalPayments.toLocaleString();
-            document.getElementById('reportPaymentRecords').textContent = paymentRecords;
-            document.getElementById('reportAveragePayment').textContent = currency + averagePayment.toLocaleString();
+            const reportTotalPayments = document.getElementById('reportTotalPayments');
+            const reportPaymentRecords = document.getElementById('reportPaymentRecords');
+            const reportAveragePayment = document.getElementById('reportAveragePayment');
+            
+            if (reportTotalPayments) reportTotalPayments.textContent = currency + totalPayments.toLocaleString();
+            if (reportPaymentRecords) reportPaymentRecords.textContent = paymentRecords;
+            if (reportAveragePayment) reportAveragePayment.textContent = currency + averagePayment.toLocaleString();
             
             // Update detailed table
             const tbody = document.getElementById('paymentReportTableBody');
+            if (!tbody) return;
+            
             tbody.innerHTML = filteredPayments.map(payment => {
                 const employee = employees.find(e => e.id === payment.employeeId);
                 const methodClass = {
@@ -2584,10 +2615,16 @@
             }).join('');
             
             // Show payment report results
-            document.getElementById('attendanceReportResults').classList.add('hidden');
-            document.getElementById('paymentReportResults').classList.remove('hidden');
-            document.getElementById('reportResults').classList.remove('hidden');
-            document.getElementById('reportResults').classList.add('fade-in');
+            const attendanceReportResults = document.getElementById('attendanceReportResults');
+            const paymentReportResults = document.getElementById('paymentReportResults');
+            const reportResults = document.getElementById('reportResults');
+            
+            if (attendanceReportResults) attendanceReportResults.classList.add('hidden');
+            if (paymentReportResults) paymentReportResults.classList.remove('hidden');
+            if (reportResults) {
+                reportResults.classList.remove('hidden');
+                reportResults.classList.add('fade-in');
+            }
         }
         
         function exportReport() {
@@ -2730,47 +2767,15 @@
         }
         
         function updateDepartmentOptions() {
-            const departments = [...new Set(employees.map(e => e.department))];
-            
-            const updateSelect = (selectId) => {
-                const select = document.getElementById(selectId);
-                const currentValue = select.value;
-                
-                select.innerHTML = '<option value="">All Departments</option>';
-                
-                departments.forEach(dept => {
-                    const option = document.createElement('option');
-                    option.value = dept;
-                    option.textContent = dept;
-                    select.appendChild(option);
-                });
-                
-                select.value = currentValue;
-            };
-            
-            updateSelect('employeeReportDepartment');
+            // This function is not used in the current implementation
+            // We can remove it to avoid errors
+            return;
         }
         
         function updateCurrencyOptions() {
-            const currencies = [...new Set(employees.map(e => e.currency))];
-            
-            const updateSelect = (selectId) => {
-                const select = document.getElementById(selectId);
-                const currentValue = select.value;
-                
-                select.innerHTML = '<option value="">All Currencies</option>';
-                
-                currencies.forEach(curr => {
-                    const option = document.createElement('option');
-                    option.value = curr;
-                    option.textContent = curr;
-                    select.appendChild(option);
-                });
-                
-                select.value = currentValue;
-            };
-            
-            updateSelect('employeeReportCurrency');
+            // This function is not used in the current implementation
+            // We can remove it to avoid errors
+            return;
         }
         
         function getCurrencySymbol(currency) {
