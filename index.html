@@ -361,6 +361,70 @@
             font-weight: 500;
             letter-spacing: 0.5px;
         }
+        
+        /* Password strength styles */
+        .password-strength-bar {
+            width: 100%;
+            height: 5px;
+            background-color: #e2e8f0;
+            border-radius: 3px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+        
+        .password-strength-indicator {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+        
+        .strength-weak {
+            background-color: #ef4444;
+            width: 25%;
+        }
+        
+        .strength-medium {
+            background-color: #f59e0b;
+            width: 60%;
+        }
+        
+        .strength-strong {
+            background-color: #10b981;
+            width: 100%;
+        }
+        
+        .password-requirements {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
+        .requirement {
+            display: flex;
+            align-items: center;
+            margin-top: 4px;
+        }
+        
+        .requirement i {
+            margin-right: 5px;
+            font-size: 10px;
+        }
+        
+        .requirement.met {
+            color: #10b981;
+        }
+        
+        .requirement.met i {
+            color: #10b981;
+        }
+        
+        .requirement.not-met {
+            color: #ef4444;
+        }
+        
+        .requirement.not-met i {
+            color: #ef4444;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -392,6 +456,9 @@
             <div class="auth-switch">
                 Don't have an account? <a href="#" id="showRegister" class="auth-link">Register</a>
             </div>
+            <div class="auth-switch mt-2">
+                <a href="#" id="showForgotPassword" class="auth-link">Forgot Password?</a>
+            </div>
         </div>
     </div>
     
@@ -410,6 +477,26 @@
                         <input type="password" id="registerPassword" class="form-input" placeholder="Choose a password" required>
                         <i class="fas fa-eye password-toggle" onclick="togglePassword('registerPassword', this)"></i>
                     </div>
+                    <div class="password-strength-bar">
+                        <div id="strengthIndicator" class="password-strength-indicator strength-weak"></div>
+                    </div>
+                    <div class="password-requirements">
+                        <div class="requirement not-met" id="lengthReq">
+                            <i class="fas fa-circle"></i> At least 8 characters
+                        </div>
+                        <div class="requirement not-met" id="uppercaseReq">
+                            <i class="fas fa-circle"></i> One uppercase letter
+                        </div>
+                        <div class="requirement not-met" id="lowercaseReq">
+                            <i class="fas fa-circle"></i> One lowercase letter
+                        </div>
+                        <div class="requirement not-met" id="numberReq">
+                            <i class="fas fa-circle"></i> One number
+                        </div>
+                        <div class="requirement not-met" id="specialReq">
+                            <i class="fas fa-circle"></i> One special character
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="confirmPassword">Confirm Password</label>
@@ -425,6 +512,28 @@
             <div class="auth-switch">
                 Already have an account? <a href="#" id="showLogin" class="auth-link">Login</a>
             </div>
+        </div>
+    </div>
+    
+    <!-- Forgot Password Container -->
+    <div id="forgotPasswordModal" class="auth-container" style="display: none;">
+        <div class="auth-box">
+            <h2 class="auth-title">Reset Password</h2>
+            <p class="text-sm text-gray-600 mb-6 text-center">Enter your email address and we'll send you a link to reset your password.</p>
+            <form id="forgotPasswordForm">
+                <div class="form-group">
+                    <label class="form-label" for="resetEmail">Email</label>
+                    <input type="email" id="resetEmail" class="form-input" placeholder="Enter your email" required>
+                </div>
+                <div class="flex justify-between items-center">
+                    <button type="button" id="backToLogin" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-300">
+                        Back to Login
+                    </button>
+                    <button type="submit" class="btn-gradient px-6 py-3 text-white font-medium rounded-xl hover-scale">
+                        Send Reset Link
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
     
@@ -1276,6 +1385,7 @@
         let currentReportData = null;
         let currentReportType = 'attendance';
         let currentUser = null;
+        let isLoggingOut = false;
         
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -1293,14 +1403,21 @@
             // Auth event listeners
             document.getElementById('loginForm').addEventListener('submit', handleLogin);
             document.getElementById('registerForm').addEventListener('submit', handleRegister);
+            document.getElementById('forgotPasswordForm').addEventListener('submit', handleForgotPassword);
             document.getElementById('showRegister').addEventListener('click', showRegister);
             document.getElementById('showLogin').addEventListener('click', showLogin);
+            document.getElementById('showForgotPassword').addEventListener('click', showForgotPassword);
+            document.getElementById('backToLogin').addEventListener('click', showLogin);
+            
+            // Password validation event listener
+            document.getElementById('registerPassword').addEventListener('input', validatePasswordStrength);
         });
         
         // Auth functions
         function showLogin() {
             document.getElementById('loginContainer').style.display = 'flex';
             document.getElementById('registerContainer').style.display = 'none';
+            document.getElementById('forgotPasswordModal').style.display = 'none';
             document.getElementById('mainApp').style.display = 'none';
             
             // Clear login form fields
@@ -1311,17 +1428,32 @@
         function showRegister() {
             document.getElementById('loginContainer').style.display = 'none';
             document.getElementById('registerContainer').style.display = 'flex';
+            document.getElementById('forgotPasswordModal').style.display = 'none';
             document.getElementById('mainApp').style.display = 'none';
             
             // Clear register form fields
             document.getElementById('registerUsername').value = '';
             document.getElementById('registerPassword').value = '';
             document.getElementById('confirmPassword').value = '';
+            
+            // Reset password strength indicator
+            resetPasswordStrength();
+        }
+        
+        function showForgotPassword() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('registerContainer').style.display = 'none';
+            document.getElementById('forgotPasswordModal').style.display = 'flex';
+            document.getElementById('mainApp').style.display = 'none';
+            
+            // Clear forgot password form
+            document.getElementById('resetEmail').value = '';
         }
         
         function showMainApp() {
             document.getElementById('loginContainer').style.display = 'none';
             document.getElementById('registerContainer').style.display = 'none';
+            document.getElementById('forgotPasswordModal').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
             
             // Update user display
@@ -1371,6 +1503,7 @@
                 .then((userCredential) => {
                     // Signed in
                     currentUser = userCredential.user;
+                    isLoggingOut = false;
                     
                     // Load the user's data
                     loadUserData();
@@ -1393,6 +1526,18 @@
             const password = document.getElementById('registerPassword').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
             
+            // Validate password strength
+            const hasLength = password.length >= 8;
+            const hasUppercase = /[A-Z]/.test(password);
+            const hasLowercase = /[a-z]/.test(password);
+            const hasNumber = /[0-9]/.test(password);
+            const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+            
+            if (!hasLength || !hasUppercase || !hasLowercase || !hasNumber || !hasSpecial) {
+                showToast('Password does not meet all requirements', 'error');
+                return;
+            }
+            
             if (password !== confirmPassword) {
                 showToast('Passwords do not match', 'error');
                 return;
@@ -1405,6 +1550,7 @@
                 .then((userCredential) => {
                     // Signed up
                     currentUser = userCredential.user;
+                    isLoggingOut = false;
                     
                     // Initialize user data in Firestore
                     initializeUserData(currentUser.uid);
@@ -1423,30 +1569,84 @@
                 });
         }
         
+        function handleForgotPassword(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('resetEmail').value;
+            
+            // Show loading
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            
+            auth.sendPasswordResetEmail(email)
+                .then(() => {
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                    showToast('Password reset email sent! Check your inbox.', 'success');
+                    showLogin();
+                })
+                .catch((error) => {
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                    showToast('Error: ' + error.message, 'error');
+                    console.error(error);
+                });
+        }
+        
         function logout() {
+            // Set flag to indicate we're logging out
+            isLoggingOut = true;
+            
+            // Show loading
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            
             // Save current user data before logging out
             if (currentUser) {
-                saveData();
-            }
-            
-            auth.signOut().then(() => {
-                // Clear current user data
-                employees = [];
-                attendanceRecords = [];
-                payments = [];
-                currentUser = null;
+                saveData().then(() => {
+                    // After saving data, sign out
+                    auth.signOut().then(() => {
+                        // Clear current user data
+                        employees = [];
+                        attendanceRecords = [];
+                        payments = [];
+                        currentUser = null;
+                        isLoggingOut = false;
+                        
+                        document.getElementById('loadingOverlay').style.display = 'none';
+                        showLogin();
+                        showToast('Logged out successfully', 'info');
+                    }).catch((error) => {
+                        console.error(error);
+                        document.getElementById('loadingOverlay').style.display = 'none';
+                        showToast('Error logging out', 'error');
+                    });
+                }).catch((error) => {
+                    console.error("Error saving data during logout:", error);
+                    // Even if saving fails, still try to log out
+                    auth.signOut().then(() => {
+                        employees = [];
+                        attendanceRecords = [];
+                        payments = [];
+                        currentUser = null;
+                        isLoggingOut = false;
+                        
+                        document.getElementById('loadingOverlay').style.display = 'none';
+                        showLogin();
+                        showToast('Logged out successfully', 'info');
+                    }).catch((logoutError) => {
+                        console.error(logoutError);
+                        document.getElementById('loadingOverlay').style.display = 'none';
+                        showToast('Error logging out', 'error');
+                    });
+                });
+            } else {
+                // If no current user, just show login
+                document.getElementById('loadingOverlay').style.display = 'none';
                 showLogin();
-                showToast('Logged out successfully', 'info');
-            }).catch((error) => {
-                console.error(error);
-                showToast('Error logging out', 'error');
-            });
+            }
         }
         
         // Initialize user data in Firestore
         function initializeUserData(userId) {
             // Create user document
-            db.collection('users').doc(userId).set({
+            return db.collection('users').doc(userId).set({
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             })
             .then(() => {
@@ -1465,7 +1665,7 @@
             document.getElementById('loadingOverlay').style.display = 'flex';
             
             // Load employees
-            db.collection('users').doc(currentUser.uid).collection('employees').get()
+            return db.collection('users').doc(currentUser.uid).collection('employees').get()
                 .then((querySnapshot) => {
                     employees = [];
                     querySnapshot.forEach((doc) => {
@@ -1504,79 +1704,193 @@
                 });
         }
         
-        // Save data to Firestore
+        // Save data to Firestore - returns a Promise
         function saveData() {
-            if (!currentUser) return;
+            return new Promise((resolve, reject) => {
+                if (!currentUser && !isLoggingOut) {
+                    reject(new Error("No current user"));
+                    return;
+                }
+                
+                if (!currentUser) {
+                    resolve();
+                    return;
+                }
+                
+                // Save employees
+                const employeesRef = db.collection('users').doc(currentUser.uid).collection('employees');
+                
+                // Delete all existing employees
+                employeesRef.get().then((querySnapshot) => {
+                    const batch = db.batch();
+                    querySnapshot.forEach((doc) => {
+                        batch.delete(doc.ref);
+                    });
+                    
+                    // Add all employees
+                    employees.forEach(employee => {
+                        const docRef = employeesRef.doc(employee.id);
+                        batch.set(docRef, employee);
+                    });
+                    
+                    return batch.commit();
+                })
+                .then(() => {
+                    console.log("Employees saved successfully");
+                    
+                    // Save attendance records
+                    const attendanceRef = db.collection('users').doc(currentUser.uid).collection('attendance');
+                    
+                    // Delete all existing attendance records
+                    return attendanceRef.get();
+                })
+                .then((querySnapshot) => {
+                    const batch = db.batch();
+                    querySnapshot.forEach((doc) => {
+                        batch.delete(doc.ref);
+                    });
+                    
+                    // Add all attendance records
+                    attendanceRecords.forEach(record => {
+                        const docRef = attendanceRef.doc(`${record.employeeId}_${record.date}`);
+                        batch.set(docRef, record);
+                    });
+                    
+                    return batch.commit();
+                })
+                .then(() => {
+                    console.log("Attendance records saved successfully");
+                    
+                    // Save payments
+                    const paymentsRef = db.collection('users').doc(currentUser.uid).collection('payments');
+                    
+                    // Delete all existing payments
+                    return paymentsRef.get();
+                })
+                .then((querySnapshot) => {
+                    const batch = db.batch();
+                    querySnapshot.forEach((doc) => {
+                        batch.delete(doc.ref);
+                    });
+                    
+                    // Add all payments
+                    payments.forEach(payment => {
+                        const docRef = paymentsRef.doc(payment.id);
+                        batch.set(docRef, payment);
+                    });
+                    
+                    return batch.commit();
+                })
+                .then(() => {
+                    console.log("Payments saved successfully");
+                    resolve();
+                })
+                .catch((error) => {
+                    console.error("Error saving data: ", error);
+                    reject(error);
+                });
+            });
+        }
+        
+        // Auto-save data every 30 seconds
+        setInterval(() => {
+            if (currentUser && !isLoggingOut) {
+                saveData().then(() => {
+                    console.log("Auto-save completed");
+                }).catch(error => {
+                    console.error("Auto-save failed:", error);
+                });
+            }
+        }, 30000);
+        
+        // Password validation function
+        function validatePasswordStrength() {
+            const password = document.getElementById('registerPassword').value;
+            const strengthIndicator = document.getElementById('strengthIndicator');
             
-            // Save employees
-            const employeesRef = db.collection('users').doc(currentUser.uid).collection('employees');
+            // Check requirements
+            const lengthReq = document.getElementById('lengthReq');
+            const uppercaseReq = document.getElementById('uppercaseReq');
+            const lowercaseReq = document.getElementById('lowercaseReq');
+            const numberReq = document.getElementById('numberReq');
+            const specialReq = document.getElementById('specialReq');
             
-            // Delete all existing employees
-            employeesRef.get().then((querySnapshot) => {
-                const batch = db.batch();
-                querySnapshot.forEach((doc) => {
-                    batch.delete(doc.ref);
-                });
-                
-                // Add all employees
-                employees.forEach(employee => {
-                    const docRef = employeesRef.doc(employee.id);
-                    batch.set(docRef, employee);
-                });
-                
-                return batch.commit();
-            })
-            .then(() => {
-                console.log("Employees saved successfully");
-                
-                // Save attendance records
-                const attendanceRef = db.collection('users').doc(currentUser.uid).collection('attendance');
-                
-                // Delete all existing attendance records
-                return attendanceRef.get();
-            })
-            .then((querySnapshot) => {
-                const batch = db.batch();
-                querySnapshot.forEach((doc) => {
-                    batch.delete(doc.ref);
-                });
-                
-                // Add all attendance records
-                attendanceRecords.forEach(record => {
-                    const docRef = attendanceRef.doc(`${record.employeeId}_${record.date}`);
-                    batch.set(docRef, record);
-                });
-                
-                return batch.commit();
-            })
-            .then(() => {
-                console.log("Attendance records saved successfully");
-                
-                // Save payments
-                const paymentsRef = db.collection('users').doc(currentUser.uid).collection('payments');
-                
-                // Delete all existing payments
-                return paymentsRef.get();
-            })
-            .then((querySnapshot) => {
-                const batch = db.batch();
-                querySnapshot.forEach((doc) => {
-                    batch.delete(doc.ref);
-                });
-                
-                // Add all payments
-                payments.forEach(payment => {
-                    const docRef = paymentsRef.doc(payment.id);
-                    batch.set(docRef, payment);
-                });
-                
-                return batch.commit();
-            })
-            .then(() => {
-                console.log("Payments saved successfully");
-            })
-            .catch((error) => {
-                console.error("Error saving data: ", error);
+            // Check each requirement
+            const hasLength = password.length >= 8;
+            const hasUppercase = /[A-Z]/.test(password);
+            const hasLowercase = /[a-z]/.test(password);
+            const hasNumber = /[0-9]/.test(password);
+            const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+            
+            // Update requirement indicators
+            if (hasLength) {
+                lengthReq.classList.remove('not-met');
+                lengthReq.classList.add('met');
+            } else {
+                lengthReq.classList.remove('met');
+                lengthReq.classList.add('not-met');
+            }
+            
+            if (hasUppercase) {
+                uppercaseReq.classList.remove('not-met');
+                uppercaseReq.classList.add('met');
+            } else {
+                uppercaseReq.classList.remove('met');
+                uppercaseReq.classList.add('not-met');
+            }
+            
+            if (hasLowercase) {
+                lowercaseReq.classList.remove('not-met');
+                lowercaseReq.classList.add('met');
+            } else {
+                lowercaseReq.classList.remove('met');
+                lowercaseReq.classList.add('not-met');
+            }
+            
+            if (hasNumber) {
+                numberReq.classList.remove('not-met');
+                numberReq.classList.add('met');
+            } else {
+                numberReq.classList.remove('met');
+                numberReq.classList.add('not-met');
+            }
+            
+            if (hasSpecial) {
+                specialReq.classList.remove('not-met');
+                specialReq.classList.add('met');
+            } else {
+                specialReq.classList.remove('met');
+                specialReq.classList.add('not-met');
+            }
+            
+            // Calculate strength
+            let strength = 0;
+            if (hasLength) strength++;
+            if (hasUppercase) strength++;
+            if (hasLowercase) strength++;
+            if (hasNumber) strength++;
+            if (hasSpecial) strength++;
+            
+            // Update strength bar
+            if (strength < 3) {
+                strengthIndicator.className = 'password-strength-indicator strength-weak';
+            } else if (strength < 5) {
+                strengthIndicator.className = 'password-strength-indicator strength-medium';
+            } else {
+                strengthIndicator.className = 'password-strength-indicator strength-strong';
+            }
+        }
+        
+        function resetPasswordStrength() {
+            const strengthIndicator = document.getElementById('strengthIndicator');
+            const requirements = ['lengthReq', 'uppercaseReq', 'lowercaseReq', 'numberReq', 'specialReq'];
+            
+            strengthIndicator.className = 'password-strength-indicator strength-weak';
+            
+            requirements.forEach(reqId => {
+                const req = document.getElementById(reqId);
+                req.classList.remove('met');
+                req.classList.add('not-met');
             });
         }
         
@@ -1754,15 +2068,19 @@
                 showToast('Attendance marked successfully', 'success');
             }
             
-            saveData();
-            updateDashboard();
-            updateCurrentMonthAttendance();
-            
-            // Reset form
-            document.getElementById('employeeSelect').value = '';
-            document.getElementById('checkInTime').value = '';
-            document.getElementById('checkOutTime').value = '';
-            document.getElementById('attendanceNotes').value = '';
+            saveData().then(() => {
+                updateDashboard();
+                updateCurrentMonthAttendance();
+                
+                // Reset form
+                document.getElementById('employeeSelect').value = '';
+                document.getElementById('checkInTime').value = '';
+                document.getElementById('checkOutTime').value = '';
+                document.getElementById('attendanceNotes').value = '';
+            }).catch(error => {
+                console.error("Error saving attendance data:", error);
+                showToast('Error saving data', 'error');
+            });
         }
         
         function updateCurrentMonthAttendance() {
@@ -1867,10 +2185,15 @@
         function deleteAttendance(employeeId, date) {
             if (confirm('Are you sure you want to delete this attendance record?')) {
                 attendanceRecords = attendanceRecords.filter(r => !(r.employeeId === employeeId && r.date === date));
-                saveData();
-                updateDashboard();
-                updateCurrentMonthAttendance();
-                showToast('Attendance record deleted', 'success');
+                
+                saveData().then(() => {
+                    updateDashboard();
+                    updateCurrentMonthAttendance();
+                    showToast('Attendance record deleted', 'success');
+                }).catch(error => {
+                    console.error("Error deleting attendance:", error);
+                    showToast('Error deleting record', 'error');
+                });
             }
         }
         
@@ -1909,12 +2232,17 @@
             }
             
             employees.push(employee);
-            saveData();
-            updateEmployeeSelects();
-            updateEmployeesTable();
-            updateDashboard();
-            closeAddEmployeeModal();
-            showToast('Employee added successfully', 'success');
+            
+            saveData().then(() => {
+                updateEmployeeSelects();
+                updateEmployeesTable();
+                updateDashboard();
+                closeAddEmployeeModal();
+                showToast('Employee added successfully', 'success');
+            }).catch(error => {
+                console.error("Error adding employee:", error);
+                showToast('Error adding employee', 'error');
+            });
         });
         
         // Edit employee functions
@@ -1979,12 +2307,16 @@
                 });
             }
             
-            saveData();
-            updateEmployeeSelects();
-            updateEmployeesTable();
-            updateDashboard();
-            closeEditEmployeeModal();
-            showToast('Employee updated successfully', 'success');
+            saveData().then(() => {
+                updateEmployeeSelects();
+                updateEmployeesTable();
+                updateDashboard();
+                closeEditEmployeeModal();
+                showToast('Employee updated successfully', 'success');
+            }).catch(error => {
+                console.error("Error updating employee:", error);
+                showToast('Error updating employee', 'error');
+            });
         });
         
         function updateEmployeeSelects() {
@@ -2107,11 +2439,16 @@
                 employees = employees.filter(e => e.id !== employeeId);
                 attendanceRecords = attendanceRecords.filter(r => r.employeeId !== employeeId);
                 payments = payments.filter(p => p.employeeId !== employeeId);
-                saveData();
-                updateEmployeeSelects();
-                updateEmployeesTable();
-                updateDashboard();
-                showToast('Employee deleted successfully', 'success');
+                
+                saveData().then(() => {
+                    updateEmployeeSelects();
+                    updateEmployeesTable();
+                    updateDashboard();
+                    showToast('Employee deleted successfully', 'success');
+                }).catch(error => {
+                    console.error("Error deleting employee:", error);
+                    showToast('Error deleting employee', 'error');
+                });
             }
         }
         
@@ -2155,10 +2492,15 @@
             };
             
             payments.push(payment);
-            saveData();
-            updatePaymentsTable();
-            closeAddPaymentModal();
-            showToast('Payment recorded successfully', 'success');
+            
+            saveData().then(() => {
+                updatePaymentsTable();
+                closeAddPaymentModal();
+                showToast('Payment recorded successfully', 'success');
+            }).catch(error => {
+                console.error("Error recording payment:", error);
+                showToast('Error recording payment', 'error');
+            });
         });
         
         function showEditPaymentModal(index) {
@@ -2197,10 +2539,14 @@
                 description: document.getElementById('editPaymentDescription').value
             };
             
-            saveData();
-            updatePaymentsTable();
-            closeEditPaymentModal();
-            showToast('Payment updated successfully', 'success');
+            saveData().then(() => {
+                updatePaymentsTable();
+                closeEditPaymentModal();
+                showToast('Payment updated successfully', 'success');
+            }).catch(error => {
+                console.error("Error updating payment:", error);
+                showToast('Error updating payment', 'error');
+            });
         });
         
         function updatePaymentsTable() {
@@ -2290,9 +2636,14 @@
         function deletePayment(paymentId) {
             if (confirm('Are you sure you want to delete this payment record?')) {
                 payments = payments.filter(p => p.id !== paymentId);
-                saveData();
-                updatePaymentsTable();
-                showToast('Payment record deleted', 'success');
+                
+                saveData().then(() => {
+                    updatePaymentsTable();
+                    showToast('Payment record deleted', 'success');
+                }).catch(error => {
+                    console.error("Error deleting payment:", error);
+                    showToast('Error deleting payment', 'error');
+                });
             }
         }
         
@@ -2764,18 +3115,6 @@
                     showToast('Error generating PDF. Please try again.', 'error');
                 }
             }, 100);
-        }
-        
-        function updateDepartmentOptions() {
-            // This function is not used in the current implementation
-            // We can remove it to avoid errors
-            return;
-        }
-        
-        function updateCurrencyOptions() {
-            // This function is not used in the current implementation
-            // We can remove it to avoid errors
-            return;
         }
         
         function getCurrencySymbol(currency) {
