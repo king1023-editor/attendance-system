@@ -1,0 +1,2833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Attendance System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding-bottom: 40px;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .slide-in {
+            animation: slideIn 0.4s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(-30px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 6px solid rgba(255, 255, 255, 0.3);
+            border-top: 6px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hover-scale {
+            transition: all 0.3s ease;
+        }
+        
+        .hover-scale:hover {
+            transform: scale(1.05);
+        }
+        
+        .card-shadow {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .card-shadow:hover {
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+            transform: translateY(-5px);
+        }
+        
+        .btn-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-gradient:hover {
+            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .nav-link {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 3px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+        }
+        
+        .nav-link:hover::after,
+        .nav-link.active::after {
+            width: 100%;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+        }
+        
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+        }
+        
+        .modal-content {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        .toast {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            z-index: 60;
+        }
+        
+        .table-hover tbody tr:hover {
+            background: rgba(102, 126, 234, 0.05);
+            transition: all 0.2s ease;
+        }
+        
+        .icon-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .neon-glow {
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.6);
+        }
+        
+        .floating {
+            animation: floating 3s ease-in-out infinite;
+        }
+        
+        @keyframes floating {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
+            }
+        }
+        
+        .gradient-border {
+            position: relative;
+            background: linear-gradient(white, white) padding-box,
+                        linear-gradient(135deg, #667eea, #764ba2) border-box;
+            border: 2px solid transparent;
+            border-radius: 1rem;
+        }
+        
+        .shimmer {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        .auth-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .auth-box {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            width: 400px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        .auth-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #4a5568;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .password-container {
+            position: relative;
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #4a5568;
+            transition: color 0.3s ease;
+        }
+        
+        .password-toggle:hover {
+            color: #667eea;
+        }
+        
+        .auth-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+        
+        .auth-link:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+        
+        .auth-switch {
+            text-align: center;
+            margin-top: 20px;
+            color: #4a5568;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px 0;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(5px);
+            z-index: 50;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .footer-text {
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+    
+    <!-- Login Container -->
+    <div id="loginContainer" class="auth-container">
+        <div class="auth-box">
+            <h2 class="auth-title">Login</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label class="form-label" for="loginUsername">Email</label>
+                    <input type="email" id="loginUsername" class="form-input" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="loginPassword">Password</label>
+                    <div class="password-container">
+                        <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" required>
+                        <i class="fas fa-eye password-toggle" onclick="togglePassword('loginPassword', this)"></i>
+                    </div>
+                </div>
+                <button type="submit" class="btn-gradient w-full py-3 text-white font-medium rounded-xl hover-scale">
+                    Login
+                </button>
+            </form>
+            <div class="auth-switch">
+                Don't have an account? <a href="#" id="showRegister" class="auth-link">Register</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Register Container -->
+    <div id="registerContainer" class="auth-container" style="display: none;">
+        <div class="auth-box">
+            <h2 class="auth-title">Register</h2>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label class="form-label" for="registerUsername">Email</label>
+                    <input type="email" id="registerUsername" class="form-input" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="registerPassword">Password</label>
+                    <div class="password-container">
+                        <input type="password" id="registerPassword" class="form-input" placeholder="Choose a password" required>
+                        <i class="fas fa-eye password-toggle" onclick="togglePassword('registerPassword', this)"></i>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="confirmPassword">Confirm Password</label>
+                    <div class="password-container">
+                        <input type="password" id="confirmPassword" class="form-input" placeholder="Confirm your password" required>
+                        <i class="fas fa-eye password-toggle" onclick="togglePassword('confirmPassword', this)"></i>
+                    </div>
+                </div>
+                <button type="submit" class="btn-gradient w-full py-3 text-white font-medium rounded-xl hover-scale">
+                    Register
+                </button>
+            </form>
+            <div class="auth-switch">
+                Already have an account? <a href="#" id="showLogin" class="auth-link">Login</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main App -->
+    <div id="mainApp" style="display: none;">
+        <!-- Header -->
+        <header class="glass-effect shadow-lg sticky top-0 z-40 neon-glow">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center floating">
+                            <i class="fas fa-clock text-white text-lg"></i>
+                        </div>
+                        <h1 class="text-xl font-bold gradient-text">Attendance System</h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-600" id="currentDateTime"></span>
+                        <div class="user-info">
+                            <div class="user-avatar" id="userAvatar">U</div>
+                            <span class="text-sm font-medium text-gray-700" id="currentUserDisplay">User</span>
+                        </div>
+                        <button class="relative p-2 rounded-full hover:bg-gray-100 transition-all duration-300 hover-scale">
+                            <i class="fas fa-bell text-gray-600"></i>
+                            <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full pulse"></span>
+                        </button>
+                        <button onclick="logout()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors duration-300">
+                            <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Navigation -->
+        <nav class="glass-effect shadow-md sticky top-16 z-30">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex flex-wrap space-x-1 md:space-x-8">
+                    <button onclick="showSection('dashboard')" class="nav-link active py-4 px-1 text-sm font-medium text-indigo-600">
+                        <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+                    </button>
+                    <button onclick="showSection('attendance')" class="nav-link py-4 px-1 text-sm font-medium text-gray-600 hover:text-indigo-600">
+                        <i class="fas fa-user-check mr-2"></i>Mark Attendance
+                    </button>
+                    <button onclick="showSection('employees')" class="nav-link py-4 px-1 text-sm font-medium text-gray-600 hover:text-indigo-600">
+                        <i class="fas fa-users mr-2"></i>Employees
+                    </button>
+                    <button onclick="showSection('salary')" class="nav-link py-4 px-1 text-sm font-medium text-gray-600 hover:text-indigo-600">
+                        <i class="fas fa-money-bill-wave mr-2"></i>Salary
+                    </button>
+                    <button onclick="showSection('payments')" class="nav-link py-4 px-1 text-sm font-medium text-gray-600 hover:text-indigo-600">
+                        <i class="fas fa-credit-card mr-2"></i>Payments
+                    </button>
+                    <button onclick="showSection('reports')" class="nav-link py-4 px-1 text-sm font-medium text-gray-600 hover:text-indigo-600">
+                        <i class="fas fa-chart-bar mr-2"></i>Reports
+                    </button>
+                </div>
+            </div>
+        </nav>
+        
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="content-section fade-in">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-white mb-2">Dashboard Overview</h2>
+                    <p class="text-gray-200">Welcome back! Here's what's happening today.</p>
+                </div>
+                
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+                    <div class="stat-card rounded-2xl p-6 card-shadow gradient-border">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 mb-1">Total Employees</p>
+                                <p class="text-3xl font-bold text-gray-900" id="totalEmployees">0</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center floating">
+                                <i class="fas fa-users text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card rounded-2xl p-6 card-shadow gradient-border">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 mb-1">Present Today</p>
+                                <p class="text-3xl font-bold text-green-600" id="presentToday">0</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center floating">
+                                <i class="fas fa-user-check text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card rounded-2xl p-6 card-shadow gradient-border">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 mb-1">On Leave</p>
+                                <p class="text-3xl font-bold text-yellow-600" id="onLeave">0</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center floating">
+                                <i class="fas fa-user-clock text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card rounded-2xl p-6 card-shadow gradient-border">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 mb-1">Half Day</p>
+                                <p class="text-3xl font-bold text-purple-600" id="halfDay">0</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center floating">
+                                <i class="fas fa-adjust text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card rounded-2xl p-6 card-shadow gradient-border">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 mb-1">Absent</p>
+                                <p class="text-3xl font-bold text-red-600" id="absentToday">0</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center floating">
+                                <i class="fas fa-user-times text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Activity -->
+                <div class="glass-effect rounded-2xl shadow-lg overflow-hidden gradient-border">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900">Recent Activity</h3>
+                    </div>
+                    <div class="p-6">
+                        <div id="recentActivity" class="space-y-4">
+                            <!-- Recent activity items will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Mark Attendance Section -->
+            <section id="attendance" class="content-section hidden">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-white mb-2">Mark Attendance</h2>
+                    <p class="text-gray-200">Record employee attendance for today.</p>
+                </div>
+                
+                <div class="glass-effect rounded-2xl shadow-lg p-6 mb-8 gradient-border">
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Employee</label>
+                        <select id="employeeSelect" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                            <option value="">Choose an employee...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                            <input type="date" id="attendanceDate" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                            <select id="attendanceStatus" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                                <option value="present">Present</option>
+                                <option value="absent">Absent</option>
+                                <option value="leave">On Leave</option>
+                                <option value="half-day">Half Day</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Check-in Time</label>
+                            <input type="time" id="checkInTime" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Check-out Time</label>
+                            <input type="time" id="checkOutTime" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
+                        <textarea id="attendanceNotes" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300" placeholder="Add any additional notes..."></textarea>
+                    </div>
+                    
+                    <div class="mt-6 flex justify-end">
+                        <button onclick="markAttendance()" class="btn-gradient px-8 py-3 text-white font-medium rounded-xl hover-scale">
+                            <i class="fas fa-save mr-2"></i>Mark Attendance
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Current Month Attendance -->
+                <div class="glass-effect rounded-2xl shadow-lg overflow-hidden gradient-border">
+                    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold text-gray-900">Current Month Attendance Details</h3>
+                        <span id="currentMonthIndicator" class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium"></span>
+                    </div>
+                    <div class="p-6">
+                        <div id="todayAttendance" class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 table-hover">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee Name</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check-in</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check-out</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Work Hour</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="todayAttendanceBody" class="bg-white divide-y divide-gray-200">
+                                    <!-- Current month's attendance records will be inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Employees Section -->
+            <section id="employees" class="content-section hidden">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h2 class="text-3xl font-bold text-white mb-2">Employee Management</h2>
+                        <p class="text-gray-200">Manage your team members and their information.</p>
+                    </div>
+                    <button onclick="showAddEmployeeModal()" class="btn-gradient px-6 py-3 text-white font-medium rounded-xl hover-scale">
+                        <i class="fas fa-plus mr-2"></i>Add Employee
+                    </button>
+                </div>
+                
+                <!-- Search Bar -->
+                <div class="mb-6">
+                    <div class="relative max-w-md">
+                        <input type="text" id="employeeSearch" placeholder="Search employees..." class="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                        <i class="fas fa-search absolute left-4 top-4 text-gray-400"></i>
+                    </div>
+                </div>
+                
+                <!-- Employees List -->
+                <div class="glass-effect rounded-2xl shadow-lg overflow-hidden gradient-border">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 table-hover">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salary</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employeesTableBody" class="bg-white divide-y divide-gray-200">
+                                <!-- Employee rows will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Salary Section -->
+            <section id="salary" class="content-section hidden">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-white mb-2">Salary Calculation</h2>
+                    <p class="text-gray-200">Calculate monthly salaries based on attendance.</p>
+                </div>
+                
+                <!-- Filter Options -->
+                <div class="glass-effect rounded-2xl shadow-lg p-6 mb-6 gradient-border">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Month</label>
+                            <input type="month" id="salaryMonth" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Employee</label>
+                            <select id="salaryEmployee" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                                <option value="">All Employees</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="calculateSalary()" class="btn-gradient px-6 py-3 text-white font-medium rounded-xl hover-scale w-full">
+                                <i class="fas fa-calculator mr-2"></i>Calculate Salary
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Salary Results -->
+                <div id="salaryResults" class="hidden">
+                    <div class="glass-effect rounded-2xl shadow-lg overflow-hidden gradient-border">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900">Salary Details</h3>
+                        </div>
+                        <div class="p-6">
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200 table-hover">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Base Salary</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Working Days</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Present Days</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Absent Days</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Half Days</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leave Days</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payments Made</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance Due</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="salaryTableBody" class="bg-white divide-y divide-gray-200">
+                                        <!-- Salary calculation rows will be inserted here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Payments Section -->
+            <section id="payments" class="content-section hidden">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h2 class="text-3xl font-bold text-white mb-2">Employee Payments</h2>
+                        <p class="text-gray-200">Track and manage employee payments.</p>
+                    </div>
+                    <button onclick="showAddPaymentModal()" class="btn-gradient px-6 py-3 text-white font-medium rounded-xl hover-scale">
+                        <i class="fas fa-plus mr-2"></i>Record Payment
+                    </button>
+                </div>
+                
+                <!-- Filter Options -->
+                <div class="glass-effect rounded-2xl shadow-lg p-6 mb-6 gradient-border">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">From Date</label>
+                            <input type="date" id="paymentFromDate" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">To Date</label>
+                            <input type="date" id="paymentToDate" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Employee</label>
+                            <select id="paymentEmployee" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                                <option value="">All Employees</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex justify-end">
+                        <button onclick="filterPayments()" class="btn-gradient px-6 py-3 text-white font-medium rounded-xl hover-scale">
+                            <i class="fas fa-filter mr-2"></i>Filter Payments
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Payments List -->
+                <div class="glass-effect rounded-2xl shadow-lg overflow-hidden gradient-border">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900">Payment Records</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 table-hover">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Method</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="paymentsTableBody" class="bg-white divide-y divide-gray-200">
+                                    <!-- Payment records will be inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Reports Section -->
+            <section id="reports" class="content-section hidden">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-white mb-2">Reports</h2>
+                    <p class="text-gray-200">Generate detailed reports for analysis.</p>
+                </div>
+                
+                <!-- Report Type Selection -->
+                <div class="glass-effect rounded-2xl shadow-lg p-6 mb-6 gradient-border">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Select Report Type</label>
+                            <select id="reportType" onchange="toggleReportOptions()" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                                <option value="attendance">Attendance Report</option>
+                                <option value="payment">Payment Report</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="generateSelectedReport()" class="btn-gradient px-6 py-3 text-white font-medium rounded-xl hover-scale w-full">
+                                <i class="fas fa-file-alt mr-2"></i>Generate Report
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Attendance Report Options -->
+                    <div id="attendanceReportOptions" class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">From Date</label>
+                            <input type="date" id="reportFromDate" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">To Date</label>
+                            <input type="date" id="reportToDate" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Employee</label>
+                            <select id="reportEmployee" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                                <option value="">All Employees</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Payment Report Options -->
+                    <div id="paymentReportOptions" class="mt-6 hidden">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">From Date</label>
+                                <input type="date" id="paymentReportFromDate" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">To Date</label>
+                                <input type="date" id="paymentReportToDate" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Employee</label>
+                                <select id="paymentReportEmployee" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                                    <option value="">All Employees</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 flex justify-end space-x-3">
+                        <button onclick="exportReport()" class="btn-gradient px-6 py-3 text-white font-medium rounded-xl hover-scale">
+                            <i class="fas fa-download mr-2"></i>Export PDF
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Report Results -->
+                <div id="reportResults" class="hidden">
+                    <!-- Attendance Report Results -->
+                    <div id="attendanceReportResults">
+                        <!-- Summary Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                            <div class="stat-card rounded-2xl p-6 card-shadow gradient-border">
+                                <div class="text-center">
+                                    <p class="text-sm font-medium text-gray-600 mb-1">Total Working Days</p>
+                                    <p class="text-3xl font-bold text-gray-900" id="reportTotalDays">0</p>
+                                </div>
+                            </div>
+                            <div class="stat-card rounded-2xl p-6 card-shadow gradient-border">
+                                <div class="text-center">
+                                    <p class="text-sm font-medium text-gray-600 mb-1">Days Present</p>
+                                    <p class="text-3xl font-bold text-green-600" id="reportDaysPresent">0</p>
+                                </div>
+                            </div>
+                            <div class="stat-card rounded-2xl p-6 card-shadow gradient-border">
+                                <div class="text-center">
+                                    <p class="text-sm font-medium text-gray-600 mb-1">Days Absent</p>
+                                    <p class="text-3xl font-bold text-red-600" id="reportDaysAbsent">0</p>
+                                </div>
+                            </div>
+                            <div class="stat-card rounded-2xl p-6 card-shadow gradient-border">
+                                <div class="text-center">
+                                    <p class="text-sm font-medium text-gray-600 mb-1">Attendance Rate</p>
+                                    <p class="text-3xl font-bold text-indigo-600" id="reportAttendanceRate">0%</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Detailed Report Table -->
+                        <div class="glass-effect rounded-2xl shadow-lg overflow-hidden gradient-border">
+                            <div class="px-6 py-4 border-b border-gray-200">
+                                <h3 class="text-lg font-semibold text-gray-900">Detailed Attendance Report</h3>
+                            </div>
+                            <div class="p-6">
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200 table-hover">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check-in</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check-out</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Working Hours</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reportTableBody" class="bg-white divide-y divide-gray-200">
+                                            <!-- Report rows will be inserted here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Payment Report Results -->
+                    <div id="paymentReportResults" class="hidden">
+                        <!-- Summary Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                            <div class="stat-card rounded-2xl p-6 card-shadow gradient-border">
+                                <div class="text-center">
+                                    <p class="text-sm font-medium text-gray-600 mb-1">Total Payments</p>
+                                    <p class="text-3xl font-bold text-gray-900" id="reportTotalPayments">0</p>
+                                </div>
+                            </div>
+                            <div class="stat-card rounded-2xl p-6 card-shadow gradient-border">
+                                <div class="text-center">
+                                    <p class="text-sm font-medium text-gray-600 mb-1">Payment Records</p>
+                                    <p class="text-3xl font-bold text-green-600" id="reportPaymentRecords">0</p>
+                                </div>
+                            </div>
+                            <div class="stat-card rounded-2xl p-6 card-shadow gradient-border">
+                                <div class="text-center">
+                                    <p class="text-sm font-medium text-gray-600 mb-1">Average Payment</p>
+                                    <p class="text-3xl font-bold text-indigo-600" id="reportAveragePayment">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Detailed Report Table -->
+                        <div class="glass-effect rounded-2xl shadow-lg overflow-hidden gradient-border">
+                            <div class="px-6 py-4 border-b border-gray-200">
+                                <h3 class="text-lg font-semibold text-gray-900">Payment Report</h3>
+                            </div>
+                            <div class="p-6">
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200 table-hover">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Method</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="paymentReportTableBody" class="bg-white divide-y divide-gray-200">
+                                            <!-- Payment report rows will be inserted here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <!-- Add Employee Modal -->
+    <div id="addEmployeeModal" class="fixed inset-0 modal-backdrop hidden overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 modal-content w-96 rounded-2xl">
+            <div class="mt-3">
+                <h3 class="text-xl font-bold gradient-text mb-4">Add New Employee</h3>
+                <form id="addEmployeeForm">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                        <input type="text" id="employeeName" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Employee ID</label>
+                        <input type="text" id="employeeId" required class="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-100" readonly>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
+                        <input type="text" id="employeeDepartment" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                        <input type="email" id="employeeEmail" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                        <input type="tel" id="employeePhone" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Monthly Salary</label>
+                        <input type="number" id="employeeSalary" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Currency</label>
+                        <select id="employeeCurrency" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                            <option value="">Select Currency</option>
+                            <option value="USD">USD - US Dollar</option>
+                            <option value="EUR">EUR - Euro</option>
+                            <option value="GBP">GBP - British Pound</option>
+                            <option value="JPY">JPY - Japanese Yen</option>
+                            <option value="CAD">CAD - Canadian Dollar</option>
+                            <option value="AUD">AUD - Australian Dollar</option>
+                            <option value="CHF">CHF - Swiss Franc</option>
+                            <option value="CNY">CNY - Chinese Yuan</option>
+                            <option value="INR">INR - Indian Rupee</option>
+                            <option value="MXN">MXN - Mexican Peso</option>
+                        </select>
+                    </div>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeAddEmployeeModal()" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all duration-300">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn-gradient px-6 py-3 text-white rounded-xl hover-scale">
+                            Add Employee
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Edit Employee Modal -->
+    <div id="editEmployeeModal" class="fixed inset-0 modal-backdrop hidden overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 modal-content w-96 rounded-2xl">
+            <div class="mt-3">
+                <h3 class="text-xl font-bold gradient-text mb-4">Edit Employee</h3>
+                <form id="editEmployeeForm">
+                    <input type="hidden" id="editEmployeeIndex">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                        <input type="text" id="editEmployeeName" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Employee ID</label>
+                        <input type="text" id="editEmployeeId" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
+                        <input type="text" id="editEmployeeDepartment" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                        <input type="email" id="editEmployeeEmail" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                        <input type="tel" id="editEmployeePhone" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Monthly Salary</label>
+                        <input type="number" id="editEmployeeSalary" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Currency</label>
+                        <select id="editEmployeeCurrency" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                            <option value="">Select Currency</option>
+                            <option value="USD">USD - US Dollar</option>
+                            <option value="EUR">EUR - Euro</option>
+                            <option value="GBP">GBP - British Pound</option>
+                            <option value="JPY">JPY - Japanese Yen</option>
+                            <option value="CAD">CAD - Canadian Dollar</option>
+                            <option value="AUD">AUD - Australian Dollar</option>
+                            <option value="CHF">CHF - Swiss Franc</option>
+                            <option value="CNY">CNY - Chinese Yuan</option>
+                            <option value="INR">INR - Indian Rupee</option>
+                            <option value="MXN">MXN - Mexican Peso</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                        <select id="editEmployeeStatus" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeEditEmployeeModal()" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all duration-300">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn-gradient px-6 py-3 text-white rounded-xl hover-scale">
+                            Update Employee
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Payment Modal -->
+    <div id="addPaymentModal" class="fixed inset-0 modal-backdrop hidden overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 modal-content w-96 rounded-2xl">
+            <div class="mt-3">
+                <h3 class="text-xl font-bold gradient-text mb-4">Record Payment</h3>
+                <form id="addPaymentForm">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Employee</label>
+                        <select id="paymentEmployeeSelect" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                            <option value="">Select Employee</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Payment Date</label>
+                        <input type="date" id="paymentDate" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                        <input type="number" id="paymentAmount" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                        <select id="paymentMethod" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                            <option value="">Select Method</option>
+                            <option value="cash">Cash</option>
+                            <option value="bank-transfer">Bank Transfer</option>
+                            <option value="check">Check</option>
+                            <option value="paypal">PayPal</option>
+                            <option value="phonepe">PhonePe</option>
+                            <option value="paytm">Paytm</option>
+                            <option value="gpay">GPay</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea id="paymentDescription" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300" placeholder="Payment description..."></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeAddPaymentModal()" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all duration-300">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn-gradient px-6 py-3 text-white rounded-xl hover-scale">
+                            Record Payment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Edit Payment Modal -->
+    <div id="editPaymentModal" class="fixed inset-0 modal-backdrop hidden overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 modal-content w-96 rounded-2xl">
+            <div class="mt-3">
+                <h3 class="text-xl font-bold gradient-text mb-4">Edit Payment</h3>
+                <form id="editPaymentForm">
+                    <input type="hidden" id="editPaymentIndex">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Employee</label>
+                        <select id="editPaymentEmployeeSelect" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                            <option value="">Select Employee</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Payment Date</label>
+                        <input type="date" id="editPaymentDate" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                        <input type="number" id="editPaymentAmount" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                        <select id="editPaymentMethod" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300">
+                            <option value="">Select Method</option>
+                            <option value="cash">Cash</option>
+                            <option value="bank-transfer">Bank Transfer</option>
+                            <option value="check">Check</option>
+                            <option value="paypal">PayPal</option>
+                            <option value="phonepe">PhonePe</option>
+                            <option value="paytm">Paytm</option>
+                            <option value="gpay">GPay</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea id="editPaymentDescription" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300" placeholder="Payment description..."></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeEditPaymentModal()" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all duration-300">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn-gradient px-6 py-3 text-white rounded-xl hover-scale">
+                            Update Payment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Success/Error Toast -->
+    <div id="toast" class="fixed bottom-4 right-4 hidden toast rounded-xl p-4 flex items-center space-x-3">
+        <i id="toastIcon" class="fas fa-check-circle text-green-500 text-xl"></i>
+        <p id="toastMessage" class="text-gray-800 font-medium"></p>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="footer">
+        <p class="footer-text">Created by Santosh Kumar</p>
+    </footer>
+    
+    <script>
+        // Initialize Firebase
+        const firebaseConfig = {
+          apiKey: "AIzaSyDbp4IctXxeOWKPuMnmhfrMr3McsuQ_1ZI",
+          authDomain: "staffattendance-90d83.firebaseapp.com",
+          projectId: "staffattendance-90d83",
+          storageBucket: "staffattendance-90d83.firebasestorage.app",
+          messagingSenderId: "327228781973",
+          appId: "1:327228781973:web:fdad0df6f6c2193efb729c",
+          measurementId: "G-7NSK461TMX"
+        };
+        
+        // Initialize Firebase only if it's not already initialized
+        let firebaseApp;
+        try {
+            firebaseApp = firebase.initializeApp(firebaseConfig);
+        } catch (e) {
+            if (e.code !== 'app/duplicate-app') {
+                console.error("Firebase initialization error", e);
+            }
+        }
+        
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        
+        // Data storage
+        let employees = [];
+        let attendanceRecords = [];
+        let payments = [];
+        let currentReportData = null;
+        let currentReportType = 'attendance';
+        let currentUser = null;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if user is logged in
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    currentUser = user;
+                    loadUserData();
+                    showMainApp();
+                } else {
+                    showLogin();
+                }
+            });
+            
+            // Auth event listeners
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+            document.getElementById('registerForm').addEventListener('submit', handleRegister);
+            document.getElementById('showRegister').addEventListener('click', showRegister);
+            document.getElementById('showLogin').addEventListener('click', showLogin);
+        });
+        
+        // Auth functions
+        function showLogin() {
+            document.getElementById('loginContainer').style.display = 'flex';
+            document.getElementById('registerContainer').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'none';
+            
+            // Clear login form fields
+            document.getElementById('loginUsername').value = '';
+            document.getElementById('loginPassword').value = '';
+        }
+        
+        function showRegister() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('registerContainer').style.display = 'flex';
+            document.getElementById('mainApp').style.display = 'none';
+            
+            // Clear register form fields
+            document.getElementById('registerUsername').value = '';
+            document.getElementById('registerPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+        }
+        
+        function showMainApp() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('registerContainer').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            
+            // Update user display
+            if (currentUser) {
+                document.getElementById('currentUserDisplay').textContent = currentUser.email;
+                document.getElementById('userAvatar').textContent = currentUser.email.charAt(0).toUpperCase();
+            }
+            
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+            
+            // Set default dates to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('attendanceDate').value = today;
+            document.getElementById('reportFromDate').value = today;
+            document.getElementById('reportToDate').value = today;
+            document.getElementById('paymentFromDate').value = today;
+            document.getElementById('paymentToDate').value = today;
+            document.getElementById('paymentDate').value = today;
+            document.getElementById('paymentReportFromDate').value = today;
+            document.getElementById('paymentReportToDate').value = today;
+            
+            // Set default month for salary calculation
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            document.getElementById('salaryMonth').value = currentMonth;
+            
+            updateDashboard();
+            updateEmployeeSelects();
+            updateEmployeesTable();
+            updateCurrentMonthAttendance();
+            updatePaymentsTable();
+            updateDepartmentOptions();
+            updateCurrencyOptions();
+            
+            // Show notification that data has been loaded
+            showToast('System ready. Data loaded successfully.', 'info');
+        }
+        
+        function handleLogin(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            // Show loading
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            
+            auth.signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    // Signed in
+                    currentUser = userCredential.user;
+                    
+                    // Load the user's data
+                    loadUserData();
+                    
+                    showMainApp();
+                    showToast('Login successful!', 'success');
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                })
+                .catch((error) => {
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                    showToast('Invalid email or password', 'error');
+                    console.error(error);
+                });
+        }
+        
+        function handleRegister(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('registerUsername').value;
+            const password = document.getElementById('registerPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            if (password !== confirmPassword) {
+                showToast('Passwords do not match', 'error');
+                return;
+            }
+            
+            // Show loading
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            
+            auth.createUserWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    // Signed up
+                    currentUser = userCredential.user;
+                    
+                    // Initialize user data in Firestore
+                    initializeUserData(currentUser.uid);
+                    
+                    // Load the user's data (which is empty for a new user)
+                    loadUserData();
+                    
+                    showToast('Registration successful! You are now logged in.', 'success');
+                    showMainApp();
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                })
+                .catch((error) => {
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                    showToast(error.message, 'error');
+                    console.error(error);
+                });
+        }
+        
+        function logout() {
+            // Save current user data before logging out
+            if (currentUser) {
+                saveData();
+            }
+            
+            auth.signOut().then(() => {
+                // Clear current user data
+                employees = [];
+                attendanceRecords = [];
+                payments = [];
+                currentUser = null;
+                showLogin();
+                showToast('Logged out successfully', 'info');
+            }).catch((error) => {
+                console.error(error);
+                showToast('Error logging out', 'error');
+            });
+        }
+        
+        // Initialize user data in Firestore
+        function initializeUserData(userId) {
+            // Create user document
+            db.collection('users').doc(userId).set({
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            })
+            .then(() => {
+                console.log("User document created");
+            })
+            .catch((error) => {
+                console.error("Error creating user document: ", error);
+            });
+        }
+        
+        // Load user data from Firestore
+        function loadUserData() {
+            if (!currentUser) return;
+            
+            // Show loading
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            
+            // Load employees
+            db.collection('users').doc(currentUser.uid).collection('employees').get()
+                .then((querySnapshot) => {
+                    employees = [];
+                    querySnapshot.forEach((doc) => {
+                        employees.push(doc.data());
+                    });
+                    
+                    // Load attendance records
+                    return db.collection('users').doc(currentUser.uid).collection('attendance').get();
+                })
+                .then((querySnapshot) => {
+                    attendanceRecords = [];
+                    querySnapshot.forEach((doc) => {
+                        attendanceRecords.push(doc.data());
+                    });
+                    
+                    // Load payments
+                    return db.collection('users').doc(currentUser.uid).collection('payments').get();
+                })
+                .then((querySnapshot) => {
+                    payments = [];
+                    querySnapshot.forEach((doc) => {
+                        payments.push(doc.data());
+                    });
+                    
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                    updateDashboard();
+                    updateEmployeeSelects();
+                    updateEmployeesTable();
+                    updateCurrentMonthAttendance();
+                    updatePaymentsTable();
+                })
+                .catch((error) => {
+                    console.error("Error loading user data: ", error);
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                    showToast('Error loading data', 'error');
+                });
+        }
+        
+        // Save data to Firestore
+        function saveData() {
+            if (!currentUser) return;
+            
+            // Save employees
+            const employeesRef = db.collection('users').doc(currentUser.uid).collection('employees');
+            
+            // Delete all existing employees
+            employeesRef.get().then((querySnapshot) => {
+                const batch = db.batch();
+                querySnapshot.forEach((doc) => {
+                    batch.delete(doc.ref);
+                });
+                
+                // Add all employees
+                employees.forEach(employee => {
+                    const docRef = employeesRef.doc(employee.id);
+                    batch.set(docRef, employee);
+                });
+                
+                return batch.commit();
+            })
+            .then(() => {
+                console.log("Employees saved successfully");
+                
+                // Save attendance records
+                const attendanceRef = db.collection('users').doc(currentUser.uid).collection('attendance');
+                
+                // Delete all existing attendance records
+                return attendanceRef.get();
+            })
+            .then((querySnapshot) => {
+                const batch = db.batch();
+                querySnapshot.forEach((doc) => {
+                    batch.delete(doc.ref);
+                });
+                
+                // Add all attendance records
+                attendanceRecords.forEach(record => {
+                    const docRef = attendanceRef.doc(`${record.employeeId}_${record.date}`);
+                    batch.set(docRef, record);
+                });
+                
+                return batch.commit();
+            })
+            .then(() => {
+                console.log("Attendance records saved successfully");
+                
+                // Save payments
+                const paymentsRef = db.collection('users').doc(currentUser.uid).collection('payments');
+                
+                // Delete all existing payments
+                return paymentsRef.get();
+            })
+            .then((querySnapshot) => {
+                const batch = db.batch();
+                querySnapshot.forEach((doc) => {
+                    batch.delete(doc.ref);
+                });
+                
+                // Add all payments
+                payments.forEach(payment => {
+                    const docRef = paymentsRef.doc(payment.id);
+                    batch.set(docRef, payment);
+                });
+                
+                return batch.commit();
+            })
+            .then(() => {
+                console.log("Payments saved successfully");
+            })
+            .catch((error) => {
+                console.error("Error saving data: ", error);
+            });
+        }
+        
+        // Update date and time
+        function updateDateTime() {
+            const now = new Date();
+            const options = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            };
+            document.getElementById('currentDateTime').textContent = now.toLocaleDateString('en-US', options);
+        }
+        
+        // Generate employee ID
+        function generateEmployeeId() {
+            if (employees.length === 0) {
+                return 'EMP001';
+            }
+            
+            // Find the highest existing employee ID number
+            const highestId = employees.reduce((max, employee) => {
+                const idNum = parseInt(employee.id.replace('EMP', ''));
+                return idNum > max ? idNum : max;
+            }, 0);
+            
+            // Format the new ID with leading zeros
+            const newIdNum = highestId + 1;
+            return `EMP${newIdNum.toString().padStart(3, '0')}`;
+        }
+        
+        // Navigation
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            // Show selected section
+            document.getElementById(sectionId).classList.remove('hidden');
+            document.getElementById(sectionId).classList.add('fade-in');
+            
+            // Update navigation
+            document.querySelectorAll('.nav-link').forEach(btn => {
+                btn.classList.remove('active', 'text-indigo-600');
+                btn.classList.add('text-gray-600');
+            });
+            event.target.closest('.nav-link').classList.remove('text-gray-600');
+            event.target.closest('.nav-link').classList.add('active', 'text-indigo-600');
+            
+            // Update section-specific data
+            if (sectionId === 'dashboard') {
+                updateDashboard();
+            } else if (sectionId === 'attendance') {
+                updateCurrentMonthAttendance();
+            } else if (sectionId === 'employees') {
+                updateEmployeesTable();
+            } else if (sectionId === 'salary') {
+                updateSalaryEmployeeSelect();
+            } else if (sectionId === 'payments') {
+                updatePaymentsTable();
+                updatePaymentEmployeeSelect();
+            }
+        }
+        
+        // Dashboard functions
+        function updateDashboard() {
+            const today = new Date().toISOString().split('T')[0];
+            const todayRecords = attendanceRecords.filter(record => record.date === today);
+            
+            document.getElementById('totalEmployees').textContent = employees.length;
+            document.getElementById('presentToday').textContent = todayRecords.filter(r => r.status === 'present').length;
+            document.getElementById('onLeave').textContent = todayRecords.filter(r => r.status === 'leave').length;
+            document.getElementById('halfDay').textContent = todayRecords.filter(r => r.status === 'half-day').length;
+            document.getElementById('absentToday').textContent = employees.length - todayRecords.length;
+            
+            updateRecentActivity();
+        }
+        
+        function updateRecentActivity() {
+            const recentActivity = document.getElementById('recentActivity');
+            
+            // Combine attendance and payment records
+            const attendanceActivities = attendanceRecords.slice(-5).map(record => {
+                const employee = employees.find(e => e.id === record.employeeId);
+                return {
+                    type: 'attendance',
+                    date: record.date,
+                    employee: employee ? employee.name : 'Unknown',
+                    status: record.status,
+                    icon: 'fa-user-check',
+                    statusClass: {
+                        'present': 'text-green-600',
+                        'absent': 'text-red-600',
+                        'leave': 'text-yellow-600',
+                        'half-day': 'text-purple-600'
+                    }[record.status] || 'text-gray-600'
+                };
+            });
+            
+            const paymentActivities = payments.slice(-5).map(payment => {
+                const employee = employees.find(e => e.id === payment.employeeId);
+                return {
+                    type: 'payment',
+                    date: payment.date,
+                    employee: employee ? employee.name : 'Unknown',
+                    status: `Payment: ${getCurrencySymbol(employee ? employee.currency : 'USD')}${payment.amount}`,
+                    icon: 'fa-money-bill-wave',
+                    statusClass: 'text-green-600'
+                };
+            });
+            
+            // Combine and sort by date
+            const allActivities = [...attendanceActivities, ...paymentActivities]
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .slice(0, 5);
+            
+            if (allActivities.length === 0) {
+                recentActivity.innerHTML = '<p class="text-gray-500 text-center py-8">No recent activity</p>';
+                return;
+            }
+            
+            recentActivity.innerHTML = allActivities.map(activity => `
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all duration-300">
+                    <div class="flex items-center">
+                        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                            <i class="fas ${activity.icon} icon-gradient text-lg"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-900">${activity.employee}</p>
+                            <p class="text-xs text-gray-500">${activity.date}</p>
+                        </div>
+                    </div>
+                    <span class="text-sm font-medium ${activity.statusClass}">
+                        ${activity.status}
+                    </span>
+                </div>
+            `).join('');
+        }
+        
+        // Attendance functions
+        function markAttendance() {
+            const employeeId = document.getElementById('employeeSelect').value;
+            const date = document.getElementById('attendanceDate').value;
+            const status = document.getElementById('attendanceStatus').value;
+            const checkIn = document.getElementById('checkInTime').value;
+            const checkOut = document.getElementById('checkOutTime').value;
+            const notes = document.getElementById('attendanceNotes').value;
+            
+            if (!employeeId || !date) {
+                showToast('Please select an employee and date', 'error');
+                return;
+            }
+            
+            // Check if attendance already exists for this employee and date
+            const existingIndex = attendanceRecords.findIndex(r => r.employeeId === employeeId && r.date === date);
+            
+            const attendanceData = {
+                employeeId,
+                date,
+                checkIn: status === 'present' || status === 'half-day' ? checkIn : '',
+                checkOut: status === 'present' || status === 'half-day' ? checkOut : '',
+                status,
+                notes
+            };
+            
+            if (existingIndex !== -1) {
+                attendanceRecords[existingIndex] = attendanceData;
+                showToast('Attendance updated successfully', 'success');
+            } else {
+                attendanceRecords.push(attendanceData);
+                showToast('Attendance marked successfully', 'success');
+            }
+            
+            saveData();
+            updateDashboard();
+            updateCurrentMonthAttendance();
+            
+            // Reset form
+            document.getElementById('employeeSelect').value = '';
+            document.getElementById('checkInTime').value = '';
+            document.getElementById('checkOutTime').value = '';
+            document.getElementById('attendanceNotes').value = '';
+        }
+        
+        function updateCurrentMonthAttendance() {
+            // Get current month and year
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth();
+            
+            // Update the month indicator
+            const monthNames = ["January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"];
+            document.getElementById('currentMonthIndicator').textContent = `${monthNames[currentMonth]} ${currentYear}`;
+            
+            // Filter attendance records for the current month
+            const currentMonthRecords = attendanceRecords.filter(record => {
+                const recordDate = new Date(record.date);
+                return recordDate.getFullYear() === currentYear && recordDate.getMonth() === currentMonth;
+            });
+            
+            const tbody = document.getElementById('todayAttendanceBody');
+            
+            if (currentMonthRecords.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-gray-500">No attendance records for this month</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = currentMonthRecords.map(record => {
+                const employee = employees.find(e => e.id === record.employeeId);
+                const statusClass = {
+                    'present': 'bg-green-100 text-green-800',
+                    'absent': 'bg-red-100 text-red-800',
+                    'leave': 'bg-yellow-100 text-yellow-800',
+                    'half-day': 'bg-purple-100 text-purple-800'
+                };
+                
+                // Calculate working hours
+                let workingHours = '-';
+                if (record.checkIn && record.checkOut) {
+                    workingHours = calculateWorkingHours(record.checkIn, record.checkOut);
+                }
+                
+                return `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.date}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                                    <i class="fas fa-user text-indigo-600 text-sm"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <div class="text-sm font-medium text-gray-900">${employee ? employee.name : 'Unknown'}</div>
+                                    <div class="text-sm text-gray-500">${employee ? employee.department : ''}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.checkIn || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.checkOut || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${workingHours}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass[record.status] || 'bg-gray-100 text-gray-800'}">
+                                ${record.status.charAt(0).toUpperCase() + record.status.slice(1).replace('-', ' ')}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button onclick="editAttendance('${record.employeeId}', '${record.date}')" class="text-indigo-600 hover:text-indigo-900 mr-3 transition-colors duration-300">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteAttendance('${record.employeeId}', '${record.date}')" class="text-red-600 hover:text-red-900 transition-colors duration-300">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        function calculateWorkingHours(checkIn, checkOut) {
+            const [inHours, inMinutes] = checkIn.split(':').map(Number);
+            const [outHours, outMinutes] = checkOut.split(':').map(Number);
+            
+            const totalMinutes = (outHours * 60 + outMinutes) - (inHours * 60 + inMinutes);
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            
+            return `${hours}h ${minutes}m`;
+        }
+        
+        function editAttendance(employeeId, date) {
+            const record = attendanceRecords.find(r => r.employeeId === employeeId && r.date === date);
+            if (!record) return;
+            
+            document.getElementById('employeeSelect').value = employeeId;
+            document.getElementById('attendanceDate').value = date;
+            document.getElementById('attendanceStatus').value = record.status;
+            document.getElementById('checkInTime').value = record.checkIn;
+            document.getElementById('checkOutTime').value = record.checkOut;
+            document.getElementById('attendanceNotes').value = record.notes;
+            
+            showSection('attendance');
+        }
+        
+        function deleteAttendance(employeeId, date) {
+            if (confirm('Are you sure you want to delete this attendance record?')) {
+                attendanceRecords = attendanceRecords.filter(r => !(r.employeeId === employeeId && r.date === date));
+                saveData();
+                updateDashboard();
+                updateCurrentMonthAttendance();
+                showToast('Attendance record deleted', 'success');
+            }
+        }
+        
+        // Employee functions
+        function showAddEmployeeModal() {
+            // Generate employee ID
+            const newEmployeeId = generateEmployeeId();
+            document.getElementById('employeeId').value = newEmployeeId;
+            
+            document.getElementById('addEmployeeModal').classList.remove('hidden');
+        }
+        
+        function closeAddEmployeeModal() {
+            document.getElementById('addEmployeeModal').classList.add('hidden');
+            document.getElementById('addEmployeeForm').reset();
+        }
+        
+        document.getElementById('addEmployeeForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const employee = {
+                id: document.getElementById('employeeId').value,
+                name: document.getElementById('employeeName').value,
+                department: document.getElementById('employeeDepartment').value,
+                email: document.getElementById('employeeEmail').value,
+                phone: document.getElementById('employeePhone').value,
+                salary: parseFloat(document.getElementById('employeeSalary').value),
+                currency: document.getElementById('employeeCurrency').value,
+                status: 'active'
+            };
+            
+            // Check if employee ID already exists
+            if (employees.find(e => e.id === employee.id)) {
+                showToast('Employee ID already exists', 'error');
+                return;
+            }
+            
+            employees.push(employee);
+            saveData();
+            updateEmployeeSelects();
+            updateEmployeesTable();
+            updateDashboard();
+            updateDepartmentOptions();
+            updateCurrencyOptions();
+            closeAddEmployeeModal();
+            showToast('Employee added successfully', 'success');
+        });
+        
+        // Edit employee functions
+        function showEditEmployeeModal(index) {
+            const employee = employees[index];
+            
+            document.getElementById('editEmployeeIndex').value = index;
+            document.getElementById('editEmployeeName').value = employee.name;
+            document.getElementById('editEmployeeId').value = employee.id;
+            document.getElementById('editEmployeeDepartment').value = employee.department;
+            document.getElementById('editEmployeeEmail').value = employee.email;
+            document.getElementById('editEmployeePhone').value = employee.phone;
+            document.getElementById('editEmployeeSalary').value = employee.salary;
+            document.getElementById('editEmployeeCurrency').value = employee.currency;
+            document.getElementById('editEmployeeStatus').value = employee.status;
+            
+            document.getElementById('editEmployeeModal').classList.remove('hidden');
+        }
+        
+        function closeEditEmployeeModal() {
+            document.getElementById('editEmployeeModal').classList.add('hidden');
+            document.getElementById('editEmployeeForm').reset();
+        }
+        
+        document.getElementById('editEmployeeForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const index = document.getElementById('editEmployeeIndex').value;
+            const originalId = employees[index].id;
+            const newId = document.getElementById('editEmployeeId').value;
+            
+            // Check if employee ID already exists (excluding current employee)
+            if (newId !== originalId && employees.find(e => e.id === newId)) {
+                showToast('Employee ID already exists', 'error');
+                return;
+            }
+            
+            // Update employee data
+            employees[index] = {
+                id: newId,
+                name: document.getElementById('editEmployeeName').value,
+                department: document.getElementById('editEmployeeDepartment').value,
+                email: document.getElementById('editEmployeeEmail').value,
+                phone: document.getElementById('editEmployeePhone').value,
+                salary: parseFloat(document.getElementById('editEmployeeSalary').value),
+                currency: document.getElementById('editEmployeeCurrency').value,
+                status: document.getElementById('editEmployeeStatus').value
+            };
+            
+            // If ID was changed, update attendance and payment records
+            if (newId !== originalId) {
+                attendanceRecords.forEach(record => {
+                    if (record.employeeId === originalId) {
+                        record.employeeId = newId;
+                    }
+                });
+                
+                payments.forEach(payment => {
+                    if (payment.employeeId === originalId) {
+                        payment.employeeId = newId;
+                    }
+                });
+            }
+            
+            saveData();
+            updateEmployeeSelects();
+            updateEmployeesTable();
+            updateDashboard();
+            updateDepartmentOptions();
+            updateCurrencyOptions();
+            closeEditEmployeeModal();
+            showToast('Employee updated successfully', 'success');
+        });
+        
+        function updateEmployeeSelects() {
+            const selects = ['employeeSelect', 'reportEmployee', 'salaryEmployee', 'paymentEmployee', 'paymentEmployeeSelect', 'editPaymentEmployeeSelect', 'paymentReportEmployee'];
+            
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                const currentValue = select.value;
+                
+                if (selectId === 'reportEmployee' || selectId === 'salaryEmployee' || selectId === 'paymentEmployee' || selectId === 'paymentEmployeeSelect' || selectId === 'editPaymentEmployeeSelect' || selectId === 'paymentReportEmployee') {
+                    select.innerHTML = '<option value="">All Employees</option>';
+                } else {
+                    select.innerHTML = '<option value="">Choose an employee...</option>';
+                }
+                
+                employees.forEach(employee => {
+                    const option = document.createElement('option');
+                    option.value = employee.id;
+                    option.textContent = `${employee.name} (${employee.id})`;
+                    select.appendChild(option);
+                });
+                
+                select.value = currentValue;
+            });
+        }
+        
+        function updateSalaryEmployeeSelect() {
+            const select = document.getElementById('salaryEmployee');
+            const currentValue = select.value;
+            
+            select.innerHTML = '<option value="">All Employees</option>';
+            
+            employees.forEach(employee => {
+                const option = document.createElement('option');
+                option.value = employee.id;
+                option.textContent = `${employee.name} (${employee.id})`;
+                select.appendChild(option);
+            });
+            
+            select.value = currentValue;
+        }
+        
+        function updatePaymentEmployeeSelect() {
+            const select = document.getElementById('paymentEmployeeSelect');
+            
+            select.innerHTML = '<option value="">Select Employee</option>';
+            
+            employees.forEach(employee => {
+                const option = document.createElement('option');
+                option.value = employee.id;
+                option.textContent = `${employee.name} (${employee.id})`;
+                select.appendChild(option);
+            });
+        }
+        
+        function updateEmployeesTable() {
+            const tbody = document.getElementById('employeesTableBody');
+            const searchTerm = document.getElementById('employeeSearch').value.toLowerCase();
+            
+            const filteredEmployees = employees.filter(employee => 
+                employee.name.toLowerCase().includes(searchTerm) ||
+                employee.id.toLowerCase().includes(searchTerm) ||
+                employee.department.toLowerCase().includes(searchTerm) ||
+                employee.email.toLowerCase().includes(searchTerm)
+            );
+            
+            if (filteredEmployees.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-8 text-center text-gray-500">No employees found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = filteredEmployees.map((employee, index) => {
+                const actualIndex = employees.findIndex(e => e.id === employee.id);
+                const statusClass = employee.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                
+                return `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                                    <i class="fas fa-user text-indigo-600"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900">${employee.name}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${employee.id}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${employee.department}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${employee.email}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${employee.phone}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${getCurrencySymbol(employee.currency)}${employee.salary.toLocaleString()}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                                ${employee.status.charAt(0).toUpperCase() + employee.status.slice(1)}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button onclick="showEditEmployeeModal(${actualIndex})" class="text-indigo-600 hover:text-indigo-900 mr-3 transition-colors duration-300">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteEmployee('${employee.id}')" class="text-red-600 hover:text-red-900 transition-colors duration-300">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        function deleteEmployee(employeeId) {
+            if (confirm('Are you sure you want to delete this employee?')) {
+                employees = employees.filter(e => e.id !== employeeId);
+                attendanceRecords = attendanceRecords.filter(r => r.employeeId !== employeeId);
+                payments = payments.filter(p => p.employeeId !== employeeId);
+                saveData();
+                updateEmployeeSelects();
+                updateEmployeesTable();
+                updateDashboard();
+                updateDepartmentOptions();
+                updateCurrencyOptions();
+                showToast('Employee deleted successfully', 'success');
+            }
+        }
+        
+        // Search functionality
+        document.getElementById('employeeSearch').addEventListener('input', updateEmployeesTable);
+        
+        // Payment functions
+        function showAddPaymentModal() {
+            // Set today's date as default
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('paymentDate').value = today;
+            
+            document.getElementById('addPaymentModal').classList.remove('hidden');
+            updatePaymentEmployeeSelect();
+        }
+        
+        function closeAddPaymentModal() {
+            document.getElementById('addPaymentModal').classList.add('hidden');
+            document.getElementById('addPaymentForm').reset();
+        }
+        
+        document.getElementById('addPaymentForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const employeeId = document.getElementById('paymentEmployeeSelect').value;
+            const employee = employees.find(e => e.id === employeeId);
+            
+            const payment = {
+                id: 'PAY' + Date.now().toString().slice(-6),
+                employeeId: employeeId,
+                date: document.getElementById('paymentDate').value,
+                amount: parseFloat(document.getElementById('paymentAmount').value),
+                method: document.getElementById('paymentMethod').value,
+                description: document.getElementById('paymentDescription').value
+            };
+            
+            payments.push(payment);
+            saveData();
+            updatePaymentsTable();
+            closeAddPaymentModal();
+            showToast('Payment recorded successfully', 'success');
+        });
+        
+        function showEditPaymentModal(index) {
+            const payment = payments[index];
+            
+            document.getElementById('editPaymentIndex').value = index;
+            document.getElementById('editPaymentEmployeeSelect').value = payment.employeeId;
+            document.getElementById('editPaymentDate').value = payment.date;
+            document.getElementById('editPaymentAmount').value = payment.amount;
+            document.getElementById('editPaymentMethod').value = payment.method;
+            document.getElementById('editPaymentDescription').value = payment.description;
+            
+            document.getElementById('editPaymentModal').classList.remove('hidden');
+        }
+        
+        function closeEditPaymentModal() {
+            document.getElementById('editPaymentModal').classList.add('hidden');
+            document.getElementById('editPaymentForm').reset();
+        }
+        
+        document.getElementById('editPaymentForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const index = document.getElementById('editPaymentIndex').value;
+            
+            // Update payment data
+            payments[index] = {
+                id: payments[index].id,
+                employeeId: document.getElementById('editPaymentEmployeeSelect').value,
+                date: document.getElementById('editPaymentDate').value,
+                amount: parseFloat(document.getElementById('editPaymentAmount').value),
+                method: document.getElementById('editPaymentMethod').value,
+                description: document.getElementById('editPaymentDescription').value
+            };
+            
+            saveData();
+            updatePaymentsTable();
+            closeEditPaymentModal();
+            showToast('Payment updated successfully', 'success');
+        });
+        
+        function updatePaymentsTable() {
+            const tbody = document.getElementById('paymentsTableBody');
+            const fromDate = document.getElementById('paymentFromDate').value;
+            const toDate = document.getElementById('paymentToDate').value;
+            const employeeId = document.getElementById('paymentEmployee').value;
+            
+            let filteredPayments = payments;
+            
+            // Apply date filters
+            if (fromDate) {
+                filteredPayments = filteredPayments.filter(p => p.date >= fromDate);
+            }
+            if (toDate) {
+                filteredPayments = filteredPayments.filter(p => p.date <= toDate);
+            }
+            
+            // Apply employee filter
+            if (employeeId) {
+                filteredPayments = filteredPayments.filter(p => p.employeeId === employeeId);
+            }
+            
+            if (filteredPayments.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">No payment records found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = filteredPayments.map((payment, index) => {
+                const employee = employees.find(e => e.id === payment.employeeId);
+                const methodClass = {
+                    'cash': 'bg-green-100 text-green-800',
+                    'bank-transfer': 'bg-blue-100 text-blue-800',
+                    'check': 'bg-yellow-100 text-yellow-800',
+                    'paypal': 'bg-purple-100 text-purple-800',
+                    'phonepe': 'bg-indigo-100 text-indigo-800',
+                    'paytm': 'bg-blue-100 text-blue-800',
+                    'gpay': 'bg-green-100 text-green-800',
+                    'other': 'bg-gray-100 text-gray-800'
+                };
+                
+                const actualIndex = payments.findIndex(p => p.id === payment.id);
+                
+                return `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${payment.date}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                                    <i class="fas fa-user text-indigo-600 text-sm"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <div class="text-sm font-medium text-gray-900">${employee ? employee.name : 'Unknown'}</div>
+                                    <div class="text-sm text-gray-500">${employee ? employee.id : ''}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${getCurrencySymbol(employee ? employee.currency : 'USD')}${payment.amount.toLocaleString()}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${methodClass[payment.method] || 'bg-gray-100 text-gray-800'}">
+                                ${payment.method === 'phonepe' ? 'PhonePe' : 
+                                  payment.method === 'paytm' ? 'Paytm' : 
+                                  payment.method === 'gpay' ? 'GPay' : 
+                                  payment.method.replace('-', ' ').charAt(0).toUpperCase() + payment.method.replace('-', ' ').slice(1)}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-900">${payment.description || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button onclick="showEditPaymentModal(${actualIndex})" class="text-indigo-600 hover:text-indigo-900 mr-3 transition-colors duration-300">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deletePayment('${payment.id}')" class="text-red-600 hover:text-red-900 transition-colors duration-300">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        function filterPayments() {
+            updatePaymentsTable();
+        }
+        
+        function deletePayment(paymentId) {
+            if (confirm('Are you sure you want to delete this payment record?')) {
+                payments = payments.filter(p => p.id !== paymentId);
+                saveData();
+                updatePaymentsTable();
+                showToast('Payment record deleted', 'success');
+            }
+        }
+        
+        // Salary calculation functions
+        function calculateSalary() {
+            const month = document.getElementById('salaryMonth').value;
+            const employeeId = document.getElementById('salaryEmployee').value;
+            
+            if (!month) {
+                showToast('Please select a month', 'error');
+                return;
+            }
+            
+            // Get the year and month from the input
+            const [year, monthNum] = month.split('-');
+            
+            // Get the number of days in the selected month
+            const daysInMonth = new Date(year, monthNum, 0).getDate();
+            
+            // Filter employees
+            const filteredEmployees = employeeId 
+                ? employees.filter(e => e.id === employeeId)
+                : employees;
+            
+            // Calculate salary for each employee
+            const salaryCalculations = filteredEmployees.map(employee => {
+                // Get attendance records for the selected month
+                const monthRecords = attendanceRecords.filter(record => {
+                    const recordDate = new Date(record.date);
+                    return record.employeeId === employee.id && 
+                           recordDate.getFullYear() == year && 
+                           recordDate.getMonth() + 1 == monthNum;
+                });
+                
+                // Count different attendance statuses
+                const presentDays = monthRecords.filter(r => r.status === 'present').length;
+                const absentDays = monthRecords.filter(r => r.status === 'absent').length;
+                const halfDays = monthRecords.filter(r => r.status === 'half-day').length;
+                const leaveDays = monthRecords.filter(r => r.status === 'leave').length;
+                
+                // Calculate daily rate
+                const dailyRate = employee.salary / daysInMonth;
+                
+                // Calculate deductions (for absent days and half days)
+                // Assuming leave is paid (no deduction)
+                const absentDeduction = absentDays * dailyRate;
+                const halfDayDeduction = halfDays * (dailyRate / 2);
+                const totalDeductions = absentDeduction + halfDayDeduction;
+                
+                // Calculate net salary
+                const netSalary = employee.salary - totalDeductions;
+                
+                // Get payments made in the selected month
+                const monthPayments = payments.filter(payment => {
+                    const paymentDate = new Date(payment.date);
+                    return payment.employeeId === employee.id && 
+                           paymentDate.getFullYear() == year && 
+                           paymentDate.getMonth() + 1 == monthNum;
+                });
+                
+                // Calculate total payments made
+                const totalPayments = monthPayments.reduce((sum, payment) => sum + payment.amount, 0);
+                
+                // Calculate balance due
+                const balanceDue = netSalary - totalPayments;
+                
+                return {
+                    employee,
+                    presentDays,
+                    absentDays,
+                    halfDays,
+                    leaveDays,
+                    totalDeductions,
+                    netSalary,
+                    totalPayments,
+                    balanceDue
+                };
+            });
+            
+            // Update salary table
+            const tbody = document.getElementById('salaryTableBody');
+            tbody.innerHTML = salaryCalculations.map(calc => `
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                                <i class="fas fa-user text-indigo-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">${calc.employee.name}</div>
+                                <div class="text-sm text-gray-500">${calc.employee.id}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${getCurrencySymbol(calc.employee.currency)}${calc.employee.salary.toLocaleString()}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${new Date(year, monthNum, 0).getDate()}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${calc.presentDays}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${calc.absentDays}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${calc.halfDays}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${calc.leaveDays}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${getCurrencySymbol(calc.employee.currency)}${calc.totalPayments.toLocaleString()}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${calc.balanceDue >= 0 ? 'text-red-600' : 'text-green-600'}">
+                        ${getCurrencySymbol(calc.employee.currency)}${Math.abs(calc.balanceDue).toLocaleString()} ${calc.balanceDue >= 0 ? '(Due)' : '(Overpaid)'}
+                    </td>
+                </tr>
+            `).join('');
+            
+            // Show salary results
+            document.getElementById('salaryResults').classList.remove('hidden');
+            document.getElementById('salaryResults').classList.add('fade-in');
+        }
+        
+        // Report functions
+        function toggleReportOptions() {
+            const reportType = document.getElementById('reportType').value;
+            const attendanceOptions = document.getElementById('attendanceReportOptions');
+            const paymentOptions = document.getElementById('paymentReportOptions');
+            
+            if (reportType === 'attendance') {
+                attendanceOptions.classList.remove('hidden');
+                paymentOptions.classList.add('hidden');
+            } else if (reportType === 'payment') {
+                attendanceOptions.classList.add('hidden');
+                paymentOptions.classList.remove('hidden');
+            }
+        }
+        
+        function generateSelectedReport() {
+            const reportType = document.getElementById('reportType').value;
+            
+            if (reportType === 'attendance') {
+                generateAttendanceReport();
+            } else if (reportType === 'payment') {
+                generatePaymentReport();
+            }
+        }
+        
+        function generateAttendanceReport() {
+            const fromDate = document.getElementById('reportFromDate').value;
+            const toDate = document.getElementById('reportToDate').value;
+            const employeeId = document.getElementById('reportEmployee').value;
+            
+            if (!fromDate || !toDate) {
+                showToast('Please select date range', 'error');
+                return;
+            }
+            
+            let filteredRecords = attendanceRecords.filter(record => 
+                record.date >= fromDate && record.date <= toDate
+            );
+            
+            if (employeeId) {
+                filteredRecords = filteredRecords.filter(record => record.employeeId === employeeId);
+            }
+            
+            // Calculate statistics
+            const totalDays = Math.ceil((new Date(toDate) - new Date(fromDate)) / (1000 * 60 * 60 * 24)) + 1;
+            const daysPresent = filteredRecords.filter(r => r.status === 'present').length;
+            const daysAbsent = filteredRecords.filter(r => r.status === 'absent').length;
+            const attendanceRate = totalDays > 0 ? Math.round((daysPresent / totalDays) * 100) : 0;
+            
+            // Store current report data for PDF export
+            currentReportData = {
+                type: 'attendance',
+                fromDate,
+                toDate,
+                employeeId,
+                filteredRecords,
+                totalDays,
+                daysPresent,
+                daysAbsent,
+                attendanceRate
+            };
+            
+            // Update summary cards
+            document.getElementById('reportTotalDays').textContent = totalDays;
+            document.getElementById('reportDaysPresent').textContent = daysPresent;
+            document.getElementById('reportDaysAbsent').textContent = daysAbsent;
+            document.getElementById('reportAttendanceRate').textContent = attendanceRate + '%';
+            
+            // Update detailed table
+            const tbody = document.getElementById('reportTableBody');
+            tbody.innerHTML = filteredRecords.map(record => {
+                const employee = employees.find(e => e.id === record.employeeId);
+                const workingHours = record.checkIn && record.checkOut ? 
+                    calculateWorkingHours(record.checkIn, record.checkOut) : '-';
+                
+                const statusClass = {
+                    'present': 'bg-green-100 text-green-800',
+                    'absent': 'bg-red-100 text-red-800',
+                    'leave': 'bg-yellow-100 text-yellow-800',
+                    'half-day': 'bg-purple-100 text-purple-800'
+                };
+                
+                return `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.date}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">${employee ? employee.name : 'Unknown'}</div>
+                            <div class="text-sm text-gray-500">${employee ? employee.id : ''}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.checkIn || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.checkOut || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass[record.status] || 'bg-gray-100 text-gray-800'}">
+                                ${record.status.charAt(0).toUpperCase() + record.status.slice(1).replace('-', ' ')}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${workingHours}</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            // Show attendance report results
+            document.getElementById('attendanceReportResults').classList.remove('hidden');
+            document.getElementById('paymentReportResults').classList.add('hidden');
+            document.getElementById('reportResults').classList.remove('hidden');
+            document.getElementById('reportResults').classList.add('fade-in');
+        }
+        
+        function generatePaymentReport() {
+            const fromDate = document.getElementById('paymentReportFromDate').value;
+            const toDate = document.getElementById('paymentReportToDate').value;
+            const employeeId = document.getElementById('paymentReportEmployee').value;
+            
+            if (!fromDate || !toDate) {
+                showToast('Please select date range', 'error');
+                return;
+            }
+            
+            let filteredPayments = payments.filter(payment => 
+                payment.date >= fromDate && payment.date <= toDate
+            );
+            
+            if (employeeId) {
+                filteredPayments = filteredPayments.filter(payment => payment.employeeId === employeeId);
+            }
+            
+            // Calculate statistics
+            const totalPayments = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
+            const paymentRecords = filteredPayments.length;
+            const averagePayment = paymentRecords > 0 ? totalPayments / paymentRecords : 0;
+            
+            // Store current report data for PDF export
+            currentReportData = {
+                type: 'payment',
+                fromDate,
+                toDate,
+                employeeId,
+                filteredPayments,
+                totalPayments,
+                paymentRecords,
+                averagePayment
+            };
+            
+            // Update summary cards
+            const currency = employeeId ? 
+                getCurrencySymbol(employees.find(e => e.id === employeeId)?.currency || 'USD') : 
+                'USD';
+            
+            document.getElementById('reportTotalPayments').textContent = currency + totalPayments.toLocaleString();
+            document.getElementById('reportPaymentRecords').textContent = paymentRecords;
+            document.getElementById('reportAveragePayment').textContent = currency + averagePayment.toLocaleString();
+            
+            // Update detailed table
+            const tbody = document.getElementById('paymentReportTableBody');
+            tbody.innerHTML = filteredPayments.map(payment => {
+                const employee = employees.find(e => e.id === payment.employeeId);
+                const methodClass = {
+                    'cash': 'bg-green-100 text-green-800',
+                    'bank-transfer': 'bg-blue-100 text-blue-800',
+                    'check': 'bg-yellow-100 text-yellow-800',
+                    'paypal': 'bg-purple-100 text-purple-800',
+                    'phonepe': 'bg-indigo-100 text-indigo-800',
+                    'paytm': 'bg-blue-100 text-blue-800',
+                    'gpay': 'bg-green-100 text-green-800',
+                    'other': 'bg-gray-100 text-gray-800'
+                };
+                
+                return `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${payment.date}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">${employee ? employee.name : 'Unknown'}</div>
+                            <div class="text-sm text-gray-500">${employee ? employee.id : ''}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${getCurrencySymbol(employee ? employee.currency : 'USD')}${payment.amount.toLocaleString()}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${methodClass[payment.method] || 'bg-gray-100 text-gray-800'}">
+                                ${payment.method === 'phonepe' ? 'PhonePe' : 
+                                  payment.method === 'paytm' ? 'Paytm' : 
+                                  payment.method === 'gpay' ? 'GPay' : 
+                                  payment.method.replace('-', ' ').charAt(0).toUpperCase() + payment.method.replace('-', ' ').slice(1)}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-900">${payment.description || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            // Show payment report results
+            document.getElementById('attendanceReportResults').classList.add('hidden');
+            document.getElementById('paymentReportResults').classList.remove('hidden');
+            document.getElementById('reportResults').classList.remove('hidden');
+            document.getElementById('reportResults').classList.add('fade-in');
+        }
+        
+        function exportReport() {
+            if (!currentReportData) {
+                showToast('Please generate a report first', 'error');
+                return;
+            }
+            
+            // Show loading overlay briefly
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            
+            // Generate PDF using jsPDF with autoTable
+            setTimeout(() => {
+                try {
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF();
+                    
+                    // Set document properties
+                    pdf.setProperties({
+                        title: `${currentReportData.type.charAt(0).toUpperCase() + currentReportData.type.slice(1)} Report`,
+                        subject: 'Employee Attendance System',
+                        author: 'Attendance System',
+                        creator: 'Attendance System'
+                    });
+                    
+                    // Add title
+                    pdf.setFontSize(18);
+                    pdf.text(`${currentReportData.type.charAt(0).toUpperCase() + currentReportData.type.slice(1)} Report`, 105, 15, { align: 'center' });
+                    
+                    // Add generation date
+                    pdf.setFontSize(10);
+                    pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, 105, 25, { align: 'center' });
+                    
+                    // Add period information
+                    pdf.setFontSize(12);
+                    pdf.text(`Period: ${currentReportData.fromDate} to ${currentReportData.toDate}`, 20, 35);
+                    
+                    // Add filter information
+                    const employee = employees.find(e => e.id === currentReportData.employeeId);
+                    const filterText = employee ? `Employee: ${employee.name} (${employee.id})` : 'All Employees';
+                    pdf.text(`Filter: ${filterText}`, 20, 42);
+                    
+                    // Add summary information
+                    if (currentReportData.type === 'attendance') {
+                        // Add attendance summary
+                        pdf.text('Summary:', 20, 52);
+                        pdf.text(`Total Working Days: ${currentReportData.totalDays}`, 20, 59);
+                        pdf.text(`Days Present: ${currentReportData.daysPresent}`, 20, 66);
+                        pdf.text(`Days Absent: ${currentReportData.daysAbsent}`, 20, 73);
+                        pdf.text(`Attendance Rate: ${currentReportData.attendanceRate}%`, 20, 80);
+                        
+                        // Prepare table data
+                        const tableData = currentReportData.filteredRecords.map(record => {
+                            const emp = employees.find(e => e.id === record.employeeId);
+                            const workingHours = record.checkIn && record.checkOut ? 
+                                calculateWorkingHours(record.checkIn, record.checkOut) : '-';
+                            
+                            return [
+                                record.date,
+                                emp ? `${emp.name} (${emp.id})` : 'Unknown',
+                                record.checkIn || '-',
+                                record.checkOut || '-',
+                                record.status.charAt(0).toUpperCase() + record.status.slice(1).replace('-', ' '),
+                                workingHours
+                            ];
+                        });
+                        
+                        // Add table
+                        pdf.autoTable({
+                            head: [['Date', 'Employee', 'Check-in', 'Check-out', 'Status', 'Working Hours']],
+                            body: tableData,
+                            startY: 90,
+                            styles: {
+                                fontSize: 9,
+                                cellPadding: 3
+                            },
+                            headStyles: {
+                                fillColor: [102, 126, 234],
+                                textColor: 255
+                            }
+                        });
+                    } else if (currentReportData.type === 'payment') {
+                        // Add payment summary
+                        const currency = employee ? 
+                            getCurrencySymbol(employee.currency) : 
+                            'USD';
+                        
+                        pdf.text('Summary:', 20, 52);
+                        pdf.text(`Total Payments: ${currency}${currentReportData.totalPayments.toLocaleString()}`, 20, 59);
+                        pdf.text(`Payment Records: ${currentReportData.paymentRecords}`, 20, 66);
+                        pdf.text(`Average Payment: ${currency}${currentReportData.averagePayment.toLocaleString()}`, 20, 73);
+                        
+                        // Prepare table data
+                        const tableData = currentReportData.filteredPayments.map(payment => {
+                            const emp = employees.find(e => e.id === payment.employeeId);
+                            
+                            return [
+                                payment.date,
+                                emp ? `${emp.name} (${emp.id})` : 'Unknown',
+                                `${getCurrencySymbol(emp ? emp.currency : 'USD')}${payment.amount.toLocaleString()}`,
+                                payment.method === 'phonepe' ? 'PhonePe' : 
+                                  payment.method === 'paytm' ? 'Paytm' : 
+                                  payment.method === 'gpay' ? 'GPay' : 
+                                  payment.method.replace('-', ' ').charAt(0).toUpperCase() + payment.method.replace('-', ' ').slice(1),
+                                payment.description || '-'
+                            ];
+                        });
+                        
+                        // Add table
+                        pdf.autoTable({
+                            head: [['Date', 'Employee', 'Amount', 'Payment Method', 'Description']],
+                            body: tableData,
+                            startY: 90,
+                            styles: {
+                                fontSize: 9,
+                                cellPadding: 3
+                            },
+                            headStyles: {
+                                fillColor: [102, 126, 234],
+                                textColor: 255
+                            }
+                        });
+                    }
+                    
+                    // Hide loading overlay
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                    
+                    // Save the PDF
+                    const fileName = `${currentReportData.type}_report_${new Date().toISOString().slice(0, 10)}.pdf`;
+                    pdf.save(fileName);
+                    
+                    // Show success message
+                    showToast('PDF exported successfully', 'success');
+                } catch (error) {
+                    console.error('Error generating PDF:', error);
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                    showToast('Error generating PDF. Please try again.', 'error');
+                }
+            }, 100);
+        }
+        
+        function updateDepartmentOptions() {
+            const departments = [...new Set(employees.map(e => e.department))];
+            
+            const updateSelect = (selectId) => {
+                const select = document.getElementById(selectId);
+                const currentValue = select.value;
+                
+                select.innerHTML = '<option value="">All Departments</option>';
+                
+                departments.forEach(dept => {
+                    const option = document.createElement('option');
+                    option.value = dept;
+                    option.textContent = dept;
+                    select.appendChild(option);
+                });
+                
+                select.value = currentValue;
+            };
+            
+            updateSelect('employeeReportDepartment');
+        }
+        
+        function updateCurrencyOptions() {
+            const currencies = [...new Set(employees.map(e => e.currency))];
+            
+            const updateSelect = (selectId) => {
+                const select = document.getElementById(selectId);
+                const currentValue = select.value;
+                
+                select.innerHTML = '<option value="">All Currencies</option>';
+                
+                currencies.forEach(curr => {
+                    const option = document.createElement('option');
+                    option.value = curr;
+                    option.textContent = curr;
+                    select.appendChild(option);
+                });
+                
+                select.value = currentValue;
+            };
+            
+            updateSelect('employeeReportCurrency');
+        }
+        
+        function getCurrencySymbol(currency) {
+            const symbols = {
+                'USD': '$',
+                'EUR': '€',
+                'GBP': '£',
+                'JPY': '¥',
+                'CAD': 'C$',
+                'AUD': 'A$',
+                'CHF': 'Fr',
+                'CNY': '¥',
+                'INR': '₹',
+                'MXN': '$'
+            };
+            
+            return symbols[currency] || '$';
+        }
+        
+        // Toggle password visibility
+        function togglePassword(inputId, icon) {
+            const passwordInput = document.getElementById(inputId);
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                passwordInput.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+        
+        // Toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastIcon = document.getElementById('toastIcon');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            // Set icon and color based on type
+            if (type === 'success') {
+                toastIcon.className = 'fas fa-check-circle text-green-500 text-xl';
+            } else if (type === 'error') {
+                toastIcon.className = 'fas fa-exclamation-circle text-red-500 text-xl';
+            } else if (type === 'info') {
+                toastIcon.className = 'fas fa-info-circle text-blue-500 text-xl';
+            }
+            
+            toastMessage.textContent = message;
+            toast.classList.remove('hidden');
+            toast.classList.add('slide-in');
+            
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
