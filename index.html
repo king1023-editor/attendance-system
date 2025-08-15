@@ -3155,18 +3155,20 @@
                 averagePayment
             };
             
-            // Update summary cards
-            const currency = employeeId ? 
-                getCurrencySymbol(employees.find(e => e.id === employeeId)?.currency || 'USD') : 
-                'USD';
+            // Update summary cards - only show currency symbol when specific employee is selected
+            let currencySymbol = '';
+            if (employeeId) {
+                const employee = employees.find(e => e.id === employeeId);
+                currencySymbol = getCurrencySymbol(employee?.currency || 'USD');
+            }
             
             const reportTotalPayments = document.getElementById('reportTotalPayments');
             const reportPaymentRecords = document.getElementById('reportPaymentRecords');
             const reportAveragePayment = document.getElementById('reportAveragePayment');
             
-            if (reportTotalPayments) reportTotalPayments.textContent = currency + totalPayments.toLocaleString();
+            if (reportTotalPayments) reportTotalPayments.textContent = currencySymbol + totalPayments.toLocaleString();
             if (reportPaymentRecords) reportPaymentRecords.textContent = paymentRecords;
-            if (reportAveragePayment) reportAveragePayment.textContent = currency + averagePayment.toLocaleString();
+            if (reportAveragePayment) reportAveragePayment.textContent = currencySymbol + averagePayment.toLocaleString();
             
             // Update detailed table
             const tbody = document.getElementById('paymentReportTableBody');
@@ -3242,31 +3244,50 @@
                         creator: 'Attendance System'
                     });
                     
-                    // Add title
+                    // Add company logo/header styling
+                    pdf.setFillColor(102, 126, 234);
+                    pdf.rect(0, 0, 210, 30, 'F');
+                    
+                    // Add title with white color
+                    pdf.setTextColor(255, 255, 255);
                     pdf.setFontSize(18);
+                    pdf.setFont(undefined, 'bold');
                     pdf.text(`${currentReportData.type.charAt(0).toUpperCase() + currentReportData.type.slice(1)} Report`, 105, 15, { align: 'center' });
                     
                     // Add generation date
                     pdf.setFontSize(10);
+                    pdf.setFont(undefined, 'normal');
                     pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, 105, 25, { align: 'center' });
                     
-                    // Add period information
+                    // Reset text color
+                    pdf.setTextColor(0, 0, 0);
+                    
+                    // Add period information with better styling
                     pdf.setFontSize(12);
-                    pdf.text(`Period: ${currentReportData.fromDate} to ${currentReportData.toDate}`, 20, 35);
+                    pdf.setFont(undefined, 'bold');
+                    pdf.text('Report Period:', 20, 45);
+                    pdf.setFont(undefined, 'normal');
+                    pdf.text(`${currentReportData.fromDate} to ${currentReportData.toDate}`, 70, 45);
                     
                     // Add filter information
+                    pdf.setFont(undefined, 'bold');
+                    pdf.text('Filter:', 20, 55);
+                    pdf.setFont(undefined, 'normal');
                     const employee = employees.find(e => e.id === currentReportData.employeeId);
                     const filterText = employee ? `Employee: ${employee.name} (${employee.id})` : 'All Employees';
-                    pdf.text(`Filter: ${filterText}`, 20, 42);
+                    pdf.text(filterText, 50, 55);
                     
-                    // Add summary information
+                    // Add summary section with styling
+                    pdf.setFont(undefined, 'bold');
+                    pdf.text('Summary:', 20, 70);
+                    
                     if (currentReportData.type === 'attendance') {
-                        // Add attendance summary
-                        pdf.text('Summary:', 20, 52);
-                        pdf.text(`Total Working Days: ${currentReportData.totalDays}`, 20, 59);
-                        pdf.text(`Days Present: ${currentReportData.daysPresent}`, 20, 66);
-                        pdf.text(`Days Absent: ${currentReportData.daysAbsent}`, 20, 73);
-                        pdf.text(`Attendance Rate: ${currentReportData.attendanceRate}%`, 20, 80);
+                        // Add attendance summary with better formatting
+                        pdf.setFont(undefined, 'normal');
+                        pdf.text(`Total Working Days: ${currentReportData.totalDays}`, 20, 80);
+                        pdf.text(`Days Present: ${currentReportData.daysPresent}`, 20, 90);
+                        pdf.text(`Days Absent: ${currentReportData.daysAbsent}`, 20, 100);
+                        pdf.text(`Attendance Rate: ${currentReportData.attendanceRate}%`, 20, 110);
                         
                         // Prepare table data
                         const tableData = currentReportData.filteredRecords.map(record => {
@@ -3284,39 +3305,41 @@
                             ];
                         });
                         
-                        // Add table
+                        // Add table with improved styling
                         pdf.autoTable({
                             head: [['Date', 'Employee', 'Check-in', 'Check-out', 'Status', 'Working Hours']],
                             body: tableData,
-                            startY: 90,
+                            startY: 125,
                             styles: {
                                 fontSize: 9,
-                                cellPadding: 3
+                                cellPadding: 3,
+                                fontStyle: 'normal'
                             },
                             headStyles: {
                                 fillColor: [102, 126, 234],
-                                textColor: 255
-                            }
+                                textColor: 255,
+                                fontStyle: 'bold'
+                            },
+                            alternateRowStyles: {
+                                fillColor: [245, 245, 245]
+                            },
+                            margin: { top: 10, right: 10, bottom: 10, left: 10 }
                         });
                     } else if (currentReportData.type === 'payment') {
-                        // Add payment summary
-                        const currency = employee ? 
-                            getCurrencySymbol(employee.currency) : 
-                            'USD';
+                        // Add payment summary - NO CURRENCY SYMBOLS
+                        pdf.setFont(undefined, 'normal');
+                        pdf.text(`Total Payments: ${currentReportData.totalPayments.toLocaleString()}`, 20, 80);
+                        pdf.text(`Payment Records: ${currentReportData.paymentRecords}`, 20, 90);
+                        pdf.text(`Average Payment: ${currentReportData.averagePayment.toLocaleString()}`, 20, 100);
                         
-                        pdf.text('Summary:', 20, 52);
-                        pdf.text(`Total Payments: ${currency}${currentReportData.totalPayments.toLocaleString()}`, 20, 59);
-                        pdf.text(`Payment Records: ${currentReportData.paymentRecords}`, 20, 66);
-                        pdf.text(`Average Payment: ${currency}${currentReportData.averagePayment.toLocaleString()}`, 20, 73);
-                        
-                        // Prepare table data
+                        // Prepare table data - remove currency symbols from table
                         const tableData = currentReportData.filteredPayments.map(payment => {
                             const emp = employees.find(e => e.id === payment.employeeId);
                             
                             return [
                                 payment.date,
                                 emp ? `${emp.name} (${emp.id})` : 'Unknown',
-                                `${getCurrencySymbol(emp ? emp.currency : 'USD')}${payment.amount.toLocaleString()}`,
+                                payment.amount.toLocaleString(), // Removed currency symbol
                                 payment.method === 'phonepe' ? 'PhonePe' : 
                                   payment.method === 'paytm' ? 'Paytm' : 
                                   payment.method === 'gpay' ? 'GPay' : 
@@ -3325,20 +3348,38 @@
                             ];
                         });
                         
-                        // Add table
+                        // Add table with improved styling
                         pdf.autoTable({
                             head: [['Date', 'Employee', 'Amount', 'Payment Method', 'Description']],
                             body: tableData,
-                            startY: 90,
+                            startY: 115,
                             styles: {
                                 fontSize: 9,
-                                cellPadding: 3
+                                cellPadding: 3,
+                                fontStyle: 'normal'
                             },
                             headStyles: {
                                 fillColor: [102, 126, 234],
-                                textColor: 255
-                            }
+                                textColor: 255,
+                                fontStyle: 'bold'
+                            },
+                            alternateRowStyles: {
+                                fillColor: [245, 245, 245]
+                            },
+                            margin: { top: 10, right: 10, bottom: 10, left: 10 }
                         });
+                    }
+                    
+                    // Add footer with page numbers
+                    const pageCount = pdf.internal.getNumberOfPages();
+                    for (let i = 1; i <= pageCount; i++) {
+                        pdf.setPage(i);
+                        pdf.setFontSize(8);
+                        pdf.setFont(undefined, 'normal');
+                        pdf.text(`Page ${i} of ${pageCount}`, pdf.internal.pageSize.getWidth() - 30, pdf.internal.pageSize.getHeight() - 10, { align: 'right' });
+                        
+                        // Add copyright notice
+                        pdf.text('© Employee Attendance System', 15, pdf.internal.pageSize.getHeight() - 10);
                     }
                     
                     // Hide loading overlay
