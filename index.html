@@ -205,7 +205,7 @@
                 box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
             }
             100% {
-                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
+                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
             }
         }
         
@@ -425,12 +425,45 @@
         .requirement.not-met i {
             color: #ef4444;
         }
+        
+        /* Sync status indicator */
+        .sync-status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            z-index: 50;
+            transition: all 0.3s ease;
+        }
+        
+        .sync-status.synced {
+            background: rgba(16, 185, 129, 0.9);
+            color: white;
+        }
+        
+        .sync-status.syncing {
+            background: rgba(245, 158, 11, 0.9);
+            color: white;
+        }
+        
+        .sync-status.error {
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="loading-overlay">
         <div class="loading-spinner"></div>
+    </div>
+    
+    <!-- Sync Status Indicator -->
+    <div id="syncStatus" class="sync-status synced">
+        <i class="fas fa-check-circle mr-1"></i> Synced
     </div>
     
     <!-- Login Container -->
@@ -555,6 +588,9 @@
                             <div class="user-avatar" id="userAvatar">U</div>
                             <span class="text-sm font-medium text-gray-700" id="currentUserDisplay">User</span>
                         </div>
+                        <button onclick="refreshData()" class="relative p-2 rounded-full hover:bg-gray-100 transition-all duration-300 hover-scale">
+                            <i class="fas fa-sync-alt text-gray-600"></i>
+                        </button>
                         <button class="relative p-2 rounded-full hover:bg-gray-100 transition-all duration-300 hover-scale">
                             <i class="fas fa-bell text-gray-600"></i>
                             <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full pulse"></span>
@@ -1350,7 +1386,7 @@
     
     <!-- Footer -->
     <footer class="footer">
-        <p class="footer-text">Created by Santosh Kumar</p>
+        <p class="footer-text">Created by Santosh Kumar [Contect-kumarsd862@gmail.com]</p>
     </footer>
     
     <script>
@@ -1375,6 +1411,18 @@
             }
         }
         
+        // Enable Firestore persistence for offline support
+        firebase.firestore().enablePersistence()
+            .catch((err) => {
+                if (err.code == 'failed-precondition') {
+                    // Multiple tabs open, persistence can only be enabled in one tab at a time
+                    console.log('Persistence failed: Multiple tabs open');
+                } else if (err.code == 'unimplemented') {
+                    // The current browser does not support all of the features required to enable persistence
+                    console.log('Persistence not supported');
+                }
+            });
+        
         const auth = firebase.auth();
         const db = firebase.firestore();
         
@@ -1387,14 +1435,29 @@
         let currentUser = null;
         let isLoggingOut = false;
         
+        // Store unsubscribe functions for real-time listeners
+        let unsubscribeEmployees = null;
+        let unsubscribeAttendance = null;
+        let unsubscribePayments = null;
+        
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             // Check if user is logged in
             auth.onAuthStateChanged(user => {
                 if (user) {
                     currentUser = user;
-                    loadUserData();
-                    showMainApp();
+                    // Show loading while data is being loaded
+                    document.getElementById('loadingOverlay').style.display = 'flex';
+                    
+                    loadUserData().then(() => {
+                        showMainApp();
+                        document.getElementById('loadingOverlay').style.display = 'none';
+                    }).catch(error => {
+                        console.error("Error loading data:", error);
+                        document.getElementById('loadingOverlay').style.display = 'none';
+                        showToast('Error loading data', 'error');
+                        showLogin();
+                    });
                 } else {
                     showLogin();
                 }
@@ -1411,6 +1474,201 @@
             
             // Password validation event listener
             document.getElementById('registerPassword').addEventListener('input', validatePasswordStrength);
+            
+            // Add event listeners for forms
+            const addEmployeeForm = document.getElementById('addEmployeeForm');
+            if (addEmployeeForm) {
+                addEmployeeForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const employee = {
+                        id: document.getElementById('employeeId').value,
+                        name: document.getElementById('employeeName').value,
+                        department: document.getElementById('employeeDepartment').value,
+                        email: document.getElementById('employeeEmail').value,
+                        phone: document.getElementById('employeePhone').value,
+                        salary: parseFloat(document.getElementById('employeeSalary').value),
+                        currency: document.getElementById('employeeCurrency').value,
+                        status: 'active'
+                    };
+                    
+                    // Check if employee ID already exists
+                    if (employees.find(e => e.id === employee.id)) {
+                        showToast('Employee ID already exists', 'error');
+                        return;
+                    }
+                    
+                    employees.push(employee);
+                    
+                    saveData().then(() => {
+                        updateEmployeeSelects();
+                        updateEmployeesTable();
+                        updateDashboard();
+                        closeAddEmployeeModal();
+                        showToast('Employee added successfully', 'success');
+                    }).catch(error => {
+                        console.error("Error adding employee:", error);
+                        showToast('Error adding employee', 'error');
+                    });
+                });
+            }
+            
+            const editEmployeeForm = document.getElementById('editEmployeeForm');
+            if (editEmployeeForm) {
+                editEmployeeForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const index = document.getElementById('editEmployeeIndex').value;
+                    const originalId = employees[index].id;
+                    const newId = document.getElementById('editEmployeeId').value;
+                    
+                    // Check if employee ID already exists (excluding current employee)
+                    if (newId !== originalId && employees.find(e => e.id === newId)) {
+                        showToast('Employee ID already exists', 'error');
+                        return;
+                    }
+                    
+                    // Update employee data
+                    employees[index] = {
+                        id: newId,
+                        name: document.getElementById('editEmployeeName').value,
+                        department: document.getElementById('editEmployeeDepartment').value,
+                        email: document.getElementById('editEmployeeEmail').value,
+                        phone: document.getElementById('editEmployeePhone').value,
+                        salary: parseFloat(document.getElementById('editEmployeeSalary').value),
+                        currency: document.getElementById('editEmployeeCurrency').value,
+                        status: document.getElementById('editEmployeeStatus').value
+                    };
+                    
+                    // If ID was changed, update attendance and payment records
+                    if (newId !== originalId) {
+                        attendanceRecords.forEach(record => {
+                            if (record.employeeId === originalId) {
+                                record.employeeId = newId;
+                            }
+                        });
+                        
+                        payments.forEach(payment => {
+                            if (payment.employeeId === originalId) {
+                                payment.employeeId = newId;
+                            }
+                        });
+                    }
+                    
+                    saveData().then(() => {
+                        updateEmployeeSelects();
+                        updateEmployeesTable();
+                        updateDashboard();
+                        closeEditEmployeeModal();
+                        showToast('Employee updated successfully', 'success');
+                    }).catch(error => {
+                        console.error("Error updating employee:", error);
+                        showToast('Error updating employee', 'error');
+                    });
+                });
+            }
+            
+            const addPaymentForm = document.getElementById('addPaymentForm');
+            if (addPaymentForm) {
+                addPaymentForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const employeeId = document.getElementById('paymentEmployeeSelect').value;
+                    const employee = employees.find(e => e.id === employeeId);
+                    
+                    const payment = {
+                        id: 'PAY' + Date.now().toString().slice(-6),
+                        employeeId: employeeId,
+                        date: document.getElementById('paymentDate').value,
+                        amount: parseFloat(document.getElementById('paymentAmount').value),
+                        method: document.getElementById('paymentMethod').value,
+                        description: document.getElementById('paymentDescription').value
+                    };
+                    
+                    payments.push(payment);
+                    
+                    saveData().then(() => {
+                        updatePaymentsTable();
+                        closeAddPaymentModal();
+                        showToast('Payment recorded successfully', 'success');
+                    }).catch(error => {
+                        console.error("Error recording payment:", error);
+                        showToast('Error recording payment', 'error');
+                    });
+                });
+            }
+            
+            const editPaymentForm = document.getElementById('editPaymentForm');
+            if (editPaymentForm) {
+                editPaymentForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const index = document.getElementById('editPaymentIndex').value;
+                    
+                    // Update payment data
+                    payments[index] = {
+                        id: payments[index].id,
+                        employeeId: document.getElementById('editPaymentEmployeeSelect').value,
+                        date: document.getElementById('editPaymentDate').value,
+                        amount: parseFloat(document.getElementById('editPaymentAmount').value),
+                        method: document.getElementById('editPaymentMethod').value,
+                        description: document.getElementById('editPaymentDescription').value
+                    };
+                    
+                    saveData().then(() => {
+                        updatePaymentsTable();
+                        closeEditPaymentModal();
+                        showToast('Payment updated successfully', 'success');
+                    }).catch(error => {
+                        console.error("Error updating payment:", error);
+                        showToast('Error updating payment', 'error');
+                    });
+                });
+            }
+            
+            // Search functionality
+            const employeeSearch = document.getElementById('employeeSearch');
+            if (employeeSearch) {
+                employeeSearch.addEventListener('input', updateEmployeesTable);
+            }
+            
+            // Handle page visibility changes
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden && currentUser) {
+                    // When page becomes visible again, refresh data
+                    refreshData();
+                }
+            });
+            
+            // Handle online/offline status
+            window.addEventListener('online', function() {
+                showToast('Back online. Syncing data...', 'info');
+                saveData().then(() => {
+                    showToast('Data synced successfully', 'success');
+                }).catch(error => {
+                    console.error("Error syncing data:", error);
+                });
+            });
+            
+            window.addEventListener('offline', function() {
+                showToast('You are offline. Changes will be saved when you reconnect.', 'warning');
+            });
+            
+            // Handle before unload
+            window.addEventListener('beforeunload', function(e) {
+                if (currentUser && !isLoggingOut) {
+                    // Try to save data before leaving
+                    saveData().then(() => {
+                        console.log("Data saved before page unload");
+                    }).catch(error => {
+                        console.error("Error saving data before page unload:", error);
+                    });
+                    
+                    // Optional: Show confirmation dialog
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
+            });
         });
         
         // Auth functions
@@ -1467,24 +1725,34 @@
             
             // Set default dates to today
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('attendanceDate').value = today;
-            document.getElementById('reportFromDate').value = today;
-            document.getElementById('reportToDate').value = today;
-            document.getElementById('paymentFromDate').value = today;
-            document.getElementById('paymentToDate').value = today;
-            document.getElementById('paymentDate').value = today;
-            document.getElementById('paymentReportFromDate').value = today;
-            document.getElementById('paymentReportToDate').value = today;
+            const attendanceDateInput = document.getElementById('attendanceDate');
+            if (attendanceDateInput) attendanceDateInput.value = today;
+            
+            const reportFromDateInput = document.getElementById('reportFromDate');
+            if (reportFromDateInput) reportFromDateInput.value = today;
+            
+            const reportToDateInput = document.getElementById('reportToDate');
+            if (reportToDateInput) reportToDateInput.value = today;
+            
+            const paymentFromDateInput = document.getElementById('paymentFromDate');
+            if (paymentFromDateInput) paymentFromDateInput.value = today;
+            
+            const paymentToDateInput = document.getElementById('paymentToDate');
+            if (paymentToDateInput) paymentToDateInput.value = today;
+            
+            const paymentDateInput = document.getElementById('paymentDate');
+            if (paymentDateInput) paymentDateInput.value = today;
+            
+            const paymentReportFromDateInput = document.getElementById('paymentReportFromDate');
+            if (paymentReportFromDateInput) paymentReportFromDateInput.value = today;
+            
+            const paymentReportToDateInput = document.getElementById('paymentReportToDate');
+            if (paymentReportToDateInput) paymentReportToDateInput.value = today;
             
             // Set default month for salary calculation
             const currentMonth = new Date().toISOString().slice(0, 7);
-            document.getElementById('salaryMonth').value = currentMonth;
-            
-            updateDashboard();
-            updateEmployeeSelects();
-            updateEmployeesTable();
-            updateCurrentMonthAttendance();
-            updatePaymentsTable();
+            const salaryMonthInput = document.getElementById('salaryMonth');
+            if (salaryMonthInput) salaryMonthInput.value = currentMonth;
             
             // Show notification that data has been loaded
             showToast('System ready. Data loaded successfully.', 'info');
@@ -1506,11 +1774,15 @@
                     isLoggingOut = false;
                     
                     // Load the user's data
-                    loadUserData();
-                    
-                    showMainApp();
-                    showToast('Login successful!', 'success');
-                    document.getElementById('loadingOverlay').style.display = 'none';
+                    loadUserData().then(() => {
+                        showMainApp();
+                        showToast('Login successful!', 'success');
+                        document.getElementById('loadingOverlay').style.display = 'none';
+                    }).catch(error => {
+                        console.error("Error loading user data:", error);
+                        document.getElementById('loadingOverlay').style.display = 'none';
+                        showToast('Error loading data', 'error');
+                    });
                 })
                 .catch((error) => {
                     document.getElementById('loadingOverlay').style.display = 'none';
@@ -1553,14 +1825,22 @@
                     isLoggingOut = false;
                     
                     // Initialize user data in Firestore
-                    initializeUserData(currentUser.uid);
-                    
-                    // Load the user's data (which is empty for a new user)
-                    loadUserData();
-                    
-                    showToast('Registration successful! You are now logged in.', 'success');
-                    showMainApp();
-                    document.getElementById('loadingOverlay').style.display = 'none';
+                    initializeUserData(currentUser.uid).then(() => {
+                        // Load the user's data (which is empty for a new user)
+                        loadUserData().then(() => {
+                            showToast('Registration successful! You are now logged in.', 'success');
+                            showMainApp();
+                            document.getElementById('loadingOverlay').style.display = 'none';
+                        }).catch(error => {
+                            console.error("Error loading user data:", error);
+                            document.getElementById('loadingOverlay').style.display = 'none';
+                            showToast('Error loading data', 'error');
+                        });
+                    }).catch(error => {
+                        console.error("Error initializing user data:", error);
+                        document.getElementById('loadingOverlay').style.display = 'none';
+                        showToast('Error creating account', 'error');
+                    });
                 })
                 .catch((error) => {
                     document.getElementById('loadingOverlay').style.display = 'none';
@@ -1593,6 +1873,16 @@
         function logout() {
             // Set flag to indicate we're logging out
             isLoggingOut = true;
+            
+            // Unsubscribe from all real-time listeners
+            if (unsubscribeEmployees) unsubscribeEmployees();
+            if (unsubscribeAttendance) unsubscribeAttendance();
+            if (unsubscribePayments) unsubscribePayments();
+            
+            // Reset unsubscribe functions
+            unsubscribeEmployees = null;
+            unsubscribeAttendance = null;
+            unsubscribePayments = null;
             
             // Show loading
             document.getElementById('loadingOverlay').style.display = 'flex';
@@ -1657,51 +1947,74 @@
             });
         }
         
-        // Load user data from Firestore
+        // Load user data from Firestore with real-time listeners
         function loadUserData() {
-            if (!currentUser) return;
+            if (!currentUser) {
+                return Promise.reject(new Error("No current user"));
+            }
             
-            // Show loading
-            document.getElementById('loadingOverlay').style.display = 'flex';
-            
-            // Load employees
-            return db.collection('users').doc(currentUser.uid).collection('employees').get()
-                .then((querySnapshot) => {
+            return new Promise((resolve, reject) => {
+                // Show loading
+                document.getElementById('loadingOverlay').style.display = 'flex';
+                
+                // Define references
+                const userRef = db.collection('users').doc(currentUser.uid);
+                const employeesRef = userRef.collection('employees');
+                const attendanceRef = userRef.collection('attendance');
+                const paymentsRef = userRef.collection('payments');
+                
+                // Clear existing data
+                employees = [];
+                attendanceRecords = [];
+                payments = [];
+                
+                // Unsubscribe from existing listeners if any
+                if (unsubscribeEmployees) unsubscribeEmployees();
+                if (unsubscribeAttendance) unsubscribeAttendance();
+                if (unsubscribePayments) unsubscribePayments();
+                
+                // Set up real-time listeners
+                
+                // Listen for employees changes
+                unsubscribeEmployees = employeesRef.onSnapshot((querySnapshot) => {
                     employees = [];
                     querySnapshot.forEach((doc) => {
                         employees.push(doc.data());
                     });
-                    
-                    // Load attendance records
-                    return db.collection('users').doc(currentUser.uid).collection('attendance').get();
-                })
-                .then((querySnapshot) => {
+                    updateEmployeeSelects();
+                    updateEmployeesTable();
+                    updateDashboard();
+                }, (error) => {
+                    console.error("Error listening to employees: ", error);
+                });
+                
+                // Listen for attendance changes
+                unsubscribeAttendance = attendanceRef.onSnapshot((querySnapshot) => {
                     attendanceRecords = [];
                     querySnapshot.forEach((doc) => {
                         attendanceRecords.push(doc.data());
                     });
-                    
-                    // Load payments
-                    return db.collection('users').doc(currentUser.uid).collection('payments').get();
-                })
-                .then((querySnapshot) => {
+                    updateDashboard();
+                    updateCurrentMonthAttendance();
+                }, (error) => {
+                    console.error("Error listening to attendance: ", error);
+                });
+                
+                // Listen for payments changes
+                unsubscribePayments = paymentsRef.onSnapshot((querySnapshot) => {
                     payments = [];
                     querySnapshot.forEach((doc) => {
                         payments.push(doc.data());
                     });
-                    
-                    document.getElementById('loadingOverlay').style.display = 'none';
-                    updateDashboard();
-                    updateEmployeeSelects();
-                    updateEmployeesTable();
-                    updateCurrentMonthAttendance();
                     updatePaymentsTable();
-                })
-                .catch((error) => {
-                    console.error("Error loading user data: ", error);
-                    document.getElementById('loadingOverlay').style.display = 'none';
-                    showToast('Error loading data', 'error');
+                }, (error) => {
+                    console.error("Error listening to payments: ", error);
                 });
+                
+                // Initial load is handled by the listeners
+                document.getElementById('loadingOverlay').style.display = 'none';
+                resolve();
+            });
         }
         
         // Save data to Firestore - returns a Promise
@@ -1717,91 +2030,73 @@
                     return;
                 }
                 
-                // Save employees
-                const employeesRef = db.collection('users').doc(currentUser.uid).collection('employees');
+                // Update sync status to syncing
+                updateSyncStatus('syncing');
                 
-                // Delete all existing employees
-                employeesRef.get().then((querySnapshot) => {
-                    const batch = db.batch();
-                    querySnapshot.forEach((doc) => {
-                        batch.delete(doc.ref);
-                    });
-                    
-                    // Add all employees
-                    employees.forEach(employee => {
-                        const docRef = employeesRef.doc(employee.id);
-                        batch.set(docRef, employee);
-                    });
-                    
-                    return batch.commit();
-                })
-                .then(() => {
-                    console.log("Employees saved successfully");
-                    
-                    // Save attendance records
-                    const attendanceRef = db.collection('users').doc(currentUser.uid).collection('attendance');
-                    
-                    // Delete all existing attendance records
-                    return attendanceRef.get();
-                })
-                .then((querySnapshot) => {
-                    const batch = db.batch();
-                    querySnapshot.forEach((doc) => {
-                        batch.delete(doc.ref);
-                    });
-                    
-                    // Add all attendance records
-                    attendanceRecords.forEach(record => {
-                        const docRef = attendanceRef.doc(`${record.employeeId}_${record.date}`);
-                        batch.set(docRef, record);
-                    });
-                    
-                    return batch.commit();
-                })
-                .then(() => {
-                    console.log("Attendance records saved successfully");
-                    
-                    // Save payments
-                    const paymentsRef = db.collection('users').doc(currentUser.uid).collection('payments');
-                    
-                    // Delete all existing payments
-                    return paymentsRef.get();
-                })
-                .then((querySnapshot) => {
-                    const batch = db.batch();
-                    querySnapshot.forEach((doc) => {
-                        batch.delete(doc.ref);
-                    });
-                    
-                    // Add all payments
-                    payments.forEach(payment => {
-                        const docRef = paymentsRef.doc(payment.id);
-                        batch.set(docRef, payment);
-                    });
-                    
-                    return batch.commit();
-                })
-                .then(() => {
-                    console.log("Payments saved successfully");
-                    resolve();
-                })
-                .catch((error) => {
-                    console.error("Error saving data: ", error);
-                    reject(error);
+                // Define all references
+                const userRef = db.collection('users').doc(currentUser.uid);
+                const employeesRef = userRef.collection('employees');
+                const attendanceRef = userRef.collection('attendance');
+                const paymentsRef = userRef.collection('payments');
+                
+                // Create a batch for all operations
+                const batch = db.batch();
+                
+                // Process employees - use upsert instead of delete/recreate
+                employees.forEach(employee => {
+                    const docRef = employeesRef.doc(employee.id);
+                    batch.set(docRef, employee, { merge: true });
                 });
+                
+                // Process attendance records - use composite ID
+                attendanceRecords.forEach(record => {
+                    const docId = `${record.employeeId}_${record.date}`;
+                    const docRef = attendanceRef.doc(docId);
+                    batch.set(docRef, record, { merge: true });
+                });
+                
+                // Process payments
+                payments.forEach(payment => {
+                    const docRef = paymentsRef.doc(payment.id);
+                    batch.set(docRef, payment, { merge: true });
+                });
+                
+                // Commit the batch
+                batch.commit()
+                    .then(() => {
+                        console.log("All data saved successfully");
+                        updateSyncStatus('synced');
+                        showToast('Data saved successfully', 'success');
+                        resolve();
+                    })
+                    .catch((error) => {
+                        console.error("Error saving data: ", error);
+                        updateSyncStatus('error');
+                        showToast('Error saving data', 'error');
+                        reject(error);
+                    });
             });
         }
         
-        // Auto-save data every 30 seconds
-        setInterval(() => {
-            if (currentUser && !isLoggingOut) {
-                saveData().then(() => {
-                    console.log("Auto-save completed");
-                }).catch(error => {
-                    console.error("Auto-save failed:", error);
-                });
+        // Update sync status indicator
+        function updateSyncStatus(status) {
+            const syncStatus = document.getElementById('syncStatus');
+            if (!syncStatus) return;
+            
+            syncStatus.className = 'sync-status ' + status;
+            
+            switch(status) {
+                case 'synced':
+                    syncStatus.innerHTML = '<i class="fas fa-check-circle mr-1"></i> Synced';
+                    break;
+                case 'syncing':
+                    syncStatus.innerHTML = '<i class="fas fa-sync-alt fa-spin mr-1"></i> Syncing...';
+                    break;
+                case 'error':
+                    syncStatus.innerHTML = '<i class="fas fa-exclamation-circle mr-1"></i> Sync Error';
+                    break;
             }
-        }, 30000);
+        }
         
         // Password validation function
         function validatePasswordStrength() {
@@ -1889,8 +2184,10 @@
             
             requirements.forEach(reqId => {
                 const req = document.getElementById(reqId);
-                req.classList.remove('met');
-                req.classList.add('not-met');
+                if (req) {
+                    req.classList.remove('met');
+                    req.classList.add('not-met');
+                }
             });
         }
         
@@ -1905,7 +2202,10 @@
                 hour: '2-digit',
                 minute: '2-digit'
             };
-            document.getElementById('currentDateTime').textContent = now.toLocaleDateString('en-US', options);
+            const currentDateTimeElement = document.getElementById('currentDateTime');
+            if (currentDateTimeElement) {
+                currentDateTimeElement.textContent = now.toLocaleDateString('en-US', options);
+            }
         }
         
         // Generate employee ID
@@ -1933,16 +2233,23 @@
             });
             
             // Show selected section
-            document.getElementById(sectionId).classList.remove('hidden');
-            document.getElementById(sectionId).classList.add('fade-in');
+            const sectionElement = document.getElementById(sectionId);
+            if (sectionElement) {
+                sectionElement.classList.remove('hidden');
+                sectionElement.classList.add('fade-in');
+            }
             
             // Update navigation
             document.querySelectorAll('.nav-link').forEach(btn => {
                 btn.classList.remove('active', 'text-indigo-600');
                 btn.classList.add('text-gray-600');
             });
-            event.target.closest('.nav-link').classList.remove('text-gray-600');
-            event.target.closest('.nav-link').classList.add('active', 'text-indigo-600');
+            
+            const activeButton = event.target.closest('.nav-link');
+            if (activeButton) {
+                activeButton.classList.remove('text-gray-600');
+                activeButton.classList.add('active', 'text-indigo-600');
+            }
             
             // Update section-specific data
             if (sectionId === 'dashboard') {
@@ -1964,17 +2271,27 @@
             const today = new Date().toISOString().split('T')[0];
             const todayRecords = attendanceRecords.filter(record => record.date === today);
             
-            document.getElementById('totalEmployees').textContent = employees.length;
-            document.getElementById('presentToday').textContent = todayRecords.filter(r => r.status === 'present').length;
-            document.getElementById('onLeave').textContent = todayRecords.filter(r => r.status === 'leave').length;
-            document.getElementById('halfDay').textContent = todayRecords.filter(r => r.status === 'half-day').length;
-            document.getElementById('absentToday').textContent = employees.length - todayRecords.length;
+            const totalEmployeesElement = document.getElementById('totalEmployees');
+            if (totalEmployeesElement) totalEmployeesElement.textContent = employees.length;
+            
+            const presentTodayElement = document.getElementById('presentToday');
+            if (presentTodayElement) presentTodayElement.textContent = todayRecords.filter(r => r.status === 'present').length;
+            
+            const onLeaveElement = document.getElementById('onLeave');
+            if (onLeaveElement) onLeaveElement.textContent = todayRecords.filter(r => r.status === 'leave').length;
+            
+            const halfDayElement = document.getElementById('halfDay');
+            if (halfDayElement) halfDayElement.textContent = todayRecords.filter(r => r.status === 'half-day').length;
+            
+            const absentTodayElement = document.getElementById('absentToday');
+            if (absentToday) absentTodayElement.textContent = employees.length - todayRecords.length;
             
             updateRecentActivity();
         }
         
         function updateRecentActivity() {
-            const recentActivity = document.getElementById('recentActivity');
+            const recentActivityElement = document.getElementById('recentActivity');
+            if (!recentActivityElement) return;
             
             // Combine attendance and payment records
             const attendanceActivities = attendanceRecords.slice(-5).map(record => {
@@ -2012,11 +2329,11 @@
                 .slice(0, 5);
             
             if (allActivities.length === 0) {
-                recentActivity.innerHTML = '<p class="text-gray-500 text-center py-8">No recent activity</p>';
+                recentActivityElement.innerHTML = '<p class="text-gray-500 text-center py-8">No recent activity</p>';
                 return;
             }
             
-            recentActivity.innerHTML = allActivities.map(activity => `
+            recentActivityElement.innerHTML = allActivities.map(activity => `
                 <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all duration-300">
                     <div class="flex items-center">
                         <div class="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
@@ -2036,12 +2353,24 @@
         
         // Attendance functions
         function markAttendance() {
-            const employeeId = document.getElementById('employeeSelect').value;
-            const date = document.getElementById('attendanceDate').value;
-            const status = document.getElementById('attendanceStatus').value;
-            const checkIn = document.getElementById('checkInTime').value;
-            const checkOut = document.getElementById('checkOutTime').value;
-            const notes = document.getElementById('attendanceNotes').value;
+            const employeeSelect = document.getElementById('employeeSelect');
+            const attendanceDate = document.getElementById('attendanceDate');
+            const attendanceStatus = document.getElementById('attendanceStatus');
+            const checkInTime = document.getElementById('checkInTime');
+            const checkOutTime = document.getElementById('checkOutTime');
+            const attendanceNotes = document.getElementById('attendanceNotes');
+            
+            if (!employeeSelect || !attendanceDate) {
+                showToast('Please select an employee and date', 'error');
+                return;
+            }
+            
+            const employeeId = employeeSelect.value;
+            const date = attendanceDate.value;
+            const status = attendanceStatus.value;
+            const checkIn = checkInTime ? checkInTime.value : '';
+            const checkOut = checkOutTime ? checkOutTime.value : '';
+            const notes = attendanceNotes ? attendanceNotes.value : '';
             
             if (!employeeId || !date) {
                 showToast('Please select an employee and date', 'error');
@@ -2073,10 +2402,10 @@
                 updateCurrentMonthAttendance();
                 
                 // Reset form
-                document.getElementById('employeeSelect').value = '';
-                document.getElementById('checkInTime').value = '';
-                document.getElementById('checkOutTime').value = '';
-                document.getElementById('attendanceNotes').value = '';
+                if (employeeSelect) employeeSelect.value = '';
+                if (checkInTime) checkInTime.value = '';
+                if (checkOutTime) checkOutTime.value = '';
+                if (attendanceNotes) attendanceNotes.value = '';
             }).catch(error => {
                 console.error("Error saving attendance data:", error);
                 showToast('Error saving data', 'error');
@@ -2092,7 +2421,10 @@
             // Update the month indicator
             const monthNames = ["January", "February", "March", "April", "May", "June",
                 "July", "August", "September", "October", "November", "December"];
-            document.getElementById('currentMonthIndicator').textContent = `${monthNames[currentMonth]} ${currentYear}`;
+            const currentMonthIndicator = document.getElementById('currentMonthIndicator');
+            if (currentMonthIndicator) {
+                currentMonthIndicator.textContent = `${monthNames[currentMonth]} ${currentYear}`;
+            }
             
             // Filter attendance records for the current month
             const currentMonthRecords = attendanceRecords.filter(record => {
@@ -2101,6 +2433,7 @@
             });
             
             const tbody = document.getElementById('todayAttendanceBody');
+            if (!tbody) return;
             
             if (currentMonthRecords.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-gray-500">No attendance records for this month</td></tr>';
@@ -2172,12 +2505,19 @@
             const record = attendanceRecords.find(r => r.employeeId === employeeId && r.date === date);
             if (!record) return;
             
-            document.getElementById('employeeSelect').value = employeeId;
-            document.getElementById('attendanceDate').value = date;
-            document.getElementById('attendanceStatus').value = record.status;
-            document.getElementById('checkInTime').value = record.checkIn;
-            document.getElementById('checkOutTime').value = record.checkOut;
-            document.getElementById('attendanceNotes').value = record.notes;
+            const employeeSelect = document.getElementById('employeeSelect');
+            const attendanceDate = document.getElementById('attendanceDate');
+            const attendanceStatus = document.getElementById('attendanceStatus');
+            const checkInTime = document.getElementById('checkInTime');
+            const checkOutTime = document.getElementById('checkOutTime');
+            const attendanceNotes = document.getElementById('attendanceNotes');
+            
+            if (employeeSelect) employeeSelect.value = employeeId;
+            if (attendanceDate) attendanceDate.value = date;
+            if (attendanceStatus) attendanceStatus.value = record.status;
+            if (checkInTime) checkInTime.value = record.checkIn;
+            if (checkOutTime) checkOutTime.value = record.checkOut;
+            if (attendanceNotes) attendanceNotes.value = record.notes;
             
             showSection('attendance');
         }
@@ -2201,123 +2541,50 @@
         function showAddEmployeeModal() {
             // Generate employee ID
             const newEmployeeId = generateEmployeeId();
-            document.getElementById('employeeId').value = newEmployeeId;
+            const employeeIdInput = document.getElementById('employeeId');
+            if (employeeIdInput) employeeIdInput.value = newEmployeeId;
             
             document.getElementById('addEmployeeModal').classList.remove('hidden');
         }
         
         function closeAddEmployeeModal() {
             document.getElementById('addEmployeeModal').classList.add('hidden');
-            document.getElementById('addEmployeeForm').reset();
+            const addEmployeeForm = document.getElementById('addEmployeeForm');
+            if (addEmployeeForm) addEmployeeForm.reset();
         }
-        
-        document.getElementById('addEmployeeForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const employee = {
-                id: document.getElementById('employeeId').value,
-                name: document.getElementById('employeeName').value,
-                department: document.getElementById('employeeDepartment').value,
-                email: document.getElementById('employeeEmail').value,
-                phone: document.getElementById('employeePhone').value,
-                salary: parseFloat(document.getElementById('employeeSalary').value),
-                currency: document.getElementById('employeeCurrency').value,
-                status: 'active'
-            };
-            
-            // Check if employee ID already exists
-            if (employees.find(e => e.id === employee.id)) {
-                showToast('Employee ID already exists', 'error');
-                return;
-            }
-            
-            employees.push(employee);
-            
-            saveData().then(() => {
-                updateEmployeeSelects();
-                updateEmployeesTable();
-                updateDashboard();
-                closeAddEmployeeModal();
-                showToast('Employee added successfully', 'success');
-            }).catch(error => {
-                console.error("Error adding employee:", error);
-                showToast('Error adding employee', 'error');
-            });
-        });
         
         // Edit employee functions
         function showEditEmployeeModal(index) {
             const employee = employees[index];
             
-            document.getElementById('editEmployeeIndex').value = index;
-            document.getElementById('editEmployeeName').value = employee.name;
-            document.getElementById('editEmployeeId').value = employee.id;
-            document.getElementById('editEmployeeDepartment').value = employee.department;
-            document.getElementById('editEmployeeEmail').value = employee.email;
-            document.getElementById('editEmployeePhone').value = employee.phone;
-            document.getElementById('editEmployeeSalary').value = employee.salary;
-            document.getElementById('editEmployeeCurrency').value = employee.currency;
-            document.getElementById('editEmployeeStatus').value = employee.status;
+            const editEmployeeIndex = document.getElementById('editEmployeeIndex');
+            const editEmployeeName = document.getElementById('editEmployeeName');
+            const editEmployeeId = document.getElementById('editEmployeeId');
+            const editEmployeeDepartment = document.getElementById('editEmployeeDepartment');
+            const editEmployeeEmail = document.getElementById('editEmployeeEmail');
+            const editEmployeePhone = document.getElementById('editEmployeePhone');
+            const editEmployeeSalary = document.getElementById('editEmployeeSalary');
+            const editEmployeeCurrency = document.getElementById('editEmployeeCurrency');
+            const editEmployeeStatus = document.getElementById('editEmployeeStatus');
+            
+            if (editEmployeeIndex) editEmployeeIndex.value = index;
+            if (editEmployeeName) editEmployeeName.value = employee.name;
+            if (editEmployeeId) editEmployeeId.value = employee.id;
+            if (editEmployeeDepartment) editEmployeeDepartment.value = employee.department;
+            if (editEmployeeEmail) editEmployeeEmail.value = employee.email;
+            if (editEmployeePhone) editEmployeePhone.value = employee.phone;
+            if (editEmployeeSalary) editEmployeeSalary.value = employee.salary;
+            if (editEmployeeCurrency) editEmployeeCurrency.value = employee.currency;
+            if (editEmployeeStatus) editEmployeeStatus.value = employee.status;
             
             document.getElementById('editEmployeeModal').classList.remove('hidden');
         }
         
         function closeEditEmployeeModal() {
             document.getElementById('editEmployeeModal').classList.add('hidden');
-            document.getElementById('editEmployeeForm').reset();
+            const editEmployeeForm = document.getElementById('editEmployeeForm');
+            if (editEmployeeForm) editEmployeeForm.reset();
         }
-        
-        document.getElementById('editEmployeeForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const index = document.getElementById('editEmployeeIndex').value;
-            const originalId = employees[index].id;
-            const newId = document.getElementById('editEmployeeId').value;
-            
-            // Check if employee ID already exists (excluding current employee)
-            if (newId !== originalId && employees.find(e => e.id === newId)) {
-                showToast('Employee ID already exists', 'error');
-                return;
-            }
-            
-            // Update employee data
-            employees[index] = {
-                id: newId,
-                name: document.getElementById('editEmployeeName').value,
-                department: document.getElementById('editEmployeeDepartment').value,
-                email: document.getElementById('editEmployeeEmail').value,
-                phone: document.getElementById('editEmployeePhone').value,
-                salary: parseFloat(document.getElementById('editEmployeeSalary').value),
-                currency: document.getElementById('editEmployeeCurrency').value,
-                status: document.getElementById('editEmployeeStatus').value
-            };
-            
-            // If ID was changed, update attendance and payment records
-            if (newId !== originalId) {
-                attendanceRecords.forEach(record => {
-                    if (record.employeeId === originalId) {
-                        record.employeeId = newId;
-                    }
-                });
-                
-                payments.forEach(payment => {
-                    if (payment.employeeId === originalId) {
-                        payment.employeeId = newId;
-                    }
-                });
-            }
-            
-            saveData().then(() => {
-                updateEmployeeSelects();
-                updateEmployeesTable();
-                updateDashboard();
-                closeEditEmployeeModal();
-                showToast('Employee updated successfully', 'success');
-            }).catch(error => {
-                console.error("Error updating employee:", error);
-                showToast('Error updating employee', 'error');
-            });
-        });
         
         function updateEmployeeSelects() {
             const selects = ['employeeSelect', 'reportEmployee', 'salaryEmployee', 'paymentEmployee', 'paymentEmployeeSelect', 'editPaymentEmployeeSelect', 'paymentReportEmployee'];
@@ -2381,7 +2648,8 @@
             const tbody = document.getElementById('employeesTableBody');
             if (!tbody) return;
             
-            const searchTerm = document.getElementById('employeeSearch') ? document.getElementById('employeeSearch').value.toLowerCase() : '';
+            const employeeSearch = document.getElementById('employeeSearch');
+            const searchTerm = employeeSearch ? employeeSearch.value.toLowerCase() : '';
             
             const filteredEmployees = employees.filter(employee => 
                 employee.name.toLowerCase().includes(searchTerm) ||
@@ -2452,9 +2720,6 @@
             }
         }
         
-        // Search functionality
-        document.getElementById('employeeSearch')?.addEventListener('input', updateEmployeesTable);
-        
         // Payment functions
         function showAddPaymentModal() {
             // Set today's date as default
@@ -2476,42 +2741,22 @@
             }
         }
         
-        document.getElementById('addPaymentForm')?.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const employeeId = document.getElementById('paymentEmployeeSelect').value;
-            const employee = employees.find(e => e.id === employeeId);
-            
-            const payment = {
-                id: 'PAY' + Date.now().toString().slice(-6),
-                employeeId: employeeId,
-                date: document.getElementById('paymentDate').value,
-                amount: parseFloat(document.getElementById('paymentAmount').value),
-                method: document.getElementById('paymentMethod').value,
-                description: document.getElementById('paymentDescription').value
-            };
-            
-            payments.push(payment);
-            
-            saveData().then(() => {
-                updatePaymentsTable();
-                closeAddPaymentModal();
-                showToast('Payment recorded successfully', 'success');
-            }).catch(error => {
-                console.error("Error recording payment:", error);
-                showToast('Error recording payment', 'error');
-            });
-        });
-        
         function showEditPaymentModal(index) {
             const payment = payments[index];
             
-            document.getElementById('editPaymentIndex').value = index;
-            document.getElementById('editPaymentEmployeeSelect').value = payment.employeeId;
-            document.getElementById('editPaymentDate').value = payment.date;
-            document.getElementById('editPaymentAmount').value = payment.amount;
-            document.getElementById('editPaymentMethod').value = payment.method;
-            document.getElementById('editPaymentDescription').value = payment.description;
+            const editPaymentIndex = document.getElementById('editPaymentIndex');
+            const editPaymentEmployeeSelect = document.getElementById('editPaymentEmployeeSelect');
+            const editPaymentDate = document.getElementById('editPaymentDate');
+            const editPaymentAmount = document.getElementById('editPaymentAmount');
+            const editPaymentMethod = document.getElementById('editPaymentMethod');
+            const editPaymentDescription = document.getElementById('editPaymentDescription');
+            
+            if (editPaymentIndex) editPaymentIndex.value = index;
+            if (editPaymentEmployeeSelect) editPaymentEmployeeSelect.value = payment.employeeId;
+            if (editPaymentDate) editPaymentDate.value = payment.date;
+            if (editPaymentAmount) editPaymentAmount.value = payment.amount;
+            if (editPaymentMethod) editPaymentMethod.value = payment.method;
+            if (editPaymentDescription) editPaymentDescription.value = payment.description;
             
             document.getElementById('editPaymentModal').classList.remove('hidden');
         }
@@ -2524,38 +2769,17 @@
             }
         }
         
-        document.getElementById('editPaymentForm')?.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const index = document.getElementById('editPaymentIndex').value;
-            
-            // Update payment data
-            payments[index] = {
-                id: payments[index].id,
-                employeeId: document.getElementById('editPaymentEmployeeSelect').value,
-                date: document.getElementById('editPaymentDate').value,
-                amount: parseFloat(document.getElementById('editPaymentAmount').value),
-                method: document.getElementById('editPaymentMethod').value,
-                description: document.getElementById('editPaymentDescription').value
-            };
-            
-            saveData().then(() => {
-                updatePaymentsTable();
-                closeEditPaymentModal();
-                showToast('Payment updated successfully', 'success');
-            }).catch(error => {
-                console.error("Error updating payment:", error);
-                showToast('Error updating payment', 'error');
-            });
-        });
-        
         function updatePaymentsTable() {
             const tbody = document.getElementById('paymentsTableBody');
             if (!tbody) return;
             
-            const fromDate = document.getElementById('paymentFromDate') ? document.getElementById('paymentFromDate').value : '';
-            const toDate = document.getElementById('paymentToDate') ? document.getElementById('paymentToDate').value : '';
-            const employeeId = document.getElementById('paymentEmployee') ? document.getElementById('paymentEmployee').value : '';
+            const paymentFromDate = document.getElementById('paymentFromDate');
+            const paymentToDate = document.getElementById('paymentToDate');
+            const paymentEmployee = document.getElementById('paymentEmployee');
+            
+            const fromDate = paymentFromDate ? paymentFromDate.value : '';
+            const toDate = paymentToDate ? paymentToDate.value : '';
+            const employeeId = paymentEmployee ? paymentEmployee.value : '';
             
             let filteredPayments = payments;
             
@@ -2649,8 +2873,11 @@
         
         // Salary calculation functions
         function calculateSalary() {
-            const month = document.getElementById('salaryMonth').value;
-            const employeeId = document.getElementById('salaryEmployee').value;
+            const salaryMonth = document.getElementById('salaryMonth');
+            const salaryEmployee = document.getElementById('salaryEmployee');
+            
+            const month = salaryMonth ? salaryMonth.value : '';
+            const employeeId = salaryEmployee ? salaryEmployee.value : '';
             
             if (!month) {
                 showToast('Please select a month', 'error');
@@ -2754,39 +2981,49 @@
             `).join('');
             
             // Show salary results
-            document.getElementById('salaryResults').classList.remove('hidden');
-            document.getElementById('salaryResults').classList.add('fade-in');
+            const salaryResults = document.getElementById('salaryResults');
+            if (salaryResults) {
+                salaryResults.classList.remove('hidden');
+                salaryResults.classList.add('fade-in');
+            }
         }
         
         // Report functions
         function toggleReportOptions() {
-            const reportType = document.getElementById('reportType').value;
+            const reportType = document.getElementById('reportType');
+            if (!reportType) return;
+            
             const attendanceOptions = document.getElementById('attendanceReportOptions');
             const paymentOptions = document.getElementById('paymentReportOptions');
             
-            if (reportType === 'attendance') {
+            if (reportType.value === 'attendance') {
                 if (attendanceOptions) attendanceOptions.classList.remove('hidden');
                 if (paymentOptions) paymentOptions.classList.add('hidden');
-            } else if (reportType === 'payment') {
+            } else if (reportType.value === 'payment') {
                 if (attendanceOptions) attendanceOptions.classList.add('hidden');
                 if (paymentOptions) paymentOptions.classList.remove('hidden');
             }
         }
         
         function generateSelectedReport() {
-            const reportType = document.getElementById('reportType').value;
+            const reportType = document.getElementById('reportType');
+            if (!reportType) return;
             
-            if (reportType === 'attendance') {
+            if (reportType.value === 'attendance') {
                 generateAttendanceReport();
-            } else if (reportType === 'payment') {
+            } else if (reportType.value === 'payment') {
                 generatePaymentReport();
             }
         }
         
         function generateAttendanceReport() {
-            const fromDate = document.getElementById('reportFromDate').value;
-            const toDate = document.getElementById('reportToDate').value;
-            const employeeId = document.getElementById('reportEmployee').value;
+            const reportFromDate = document.getElementById('reportFromDate');
+            const reportToDate = document.getElementById('reportToDate');
+            const reportEmployee = document.getElementById('reportEmployee');
+            
+            const fromDate = reportFromDate ? reportFromDate.value : '';
+            const toDate = reportToDate ? reportToDate.value : '';
+            const employeeId = reportEmployee ? reportEmployee.value : '';
             
             if (!fromDate || !toDate) {
                 showToast('Please select date range', 'error');
@@ -2880,9 +3117,13 @@
         }
         
         function generatePaymentReport() {
-            const fromDate = document.getElementById('paymentReportFromDate').value;
-            const toDate = document.getElementById('paymentReportToDate').value;
-            const employeeId = document.getElementById('paymentReportEmployee').value;
+            const paymentReportFromDate = document.getElementById('paymentReportFromDate');
+            const paymentReportToDate = document.getElementById('paymentReportToDate');
+            const paymentReportEmployee = document.getElementById('paymentReportEmployee');
+            
+            const fromDate = paymentReportFromDate ? paymentReportFromDate.value : '';
+            const toDate = paymentReportToDate ? paymentReportToDate.value : '';
+            const employeeId = paymentReportEmployee ? paymentReportEmployee.value : '';
             
             if (!fromDate || !toDate) {
                 showToast('Please select date range', 'error');
@@ -3137,6 +3378,7 @@
         // Toggle password visibility
         function togglePassword(inputId, icon) {
             const passwordInput = document.getElementById(inputId);
+            if (!passwordInput) return;
             
             if (passwordInput.type === 'password') {
                 passwordInput.type = 'text';
@@ -3149,11 +3391,26 @@
             }
         }
         
+        // Refresh data function
+        function refreshData() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            loadUserData().then(() => {
+                showToast('Data refreshed', 'success');
+                document.getElementById('loadingOverlay').style.display = 'none';
+            }).catch(error => {
+                console.error("Error refreshing data:", error);
+                document.getElementById('loadingOverlay').style.display = 'none';
+                showToast('Error refreshing data', 'error');
+            });
+        }
+        
         // Toast notification
         function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
             const toastIcon = document.getElementById('toastIcon');
             const toastMessage = document.getElementById('toastMessage');
+            
+            if (!toast || !toastIcon || !toastMessage) return;
             
             // Set icon and color based on type
             if (type === 'success') {
@@ -3162,6 +3419,8 @@
                 toastIcon.className = 'fas fa-exclamation-circle text-red-500 text-xl';
             } else if (type === 'info') {
                 toastIcon.className = 'fas fa-info-circle text-blue-500 text-xl';
+            } else if (type === 'warning') {
+                toastIcon.className = 'fas fa-exclamation-triangle text-yellow-500 text-xl';
             }
             
             toastMessage.textContent = message;
